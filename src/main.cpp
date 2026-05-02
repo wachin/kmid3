@@ -25,13 +25,20 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QUrl>
+#include <QLibraryInfo>
+#include <QCoreApplication>
 
 static const char description[] = I18N_NOOP("A KDE MIDI/Karaoke player");
 static const char version[] = VERSION;
 
 int main(int argc, char **argv)
 {
+    // Allow finding plugins installed under /usr/local (or any custom prefix)
+    QCoreApplication::addLibraryPath(QStringLiteral("/usr/local/lib/x86_64-linux-gnu/plugins"));
+
     QApplication app(argc, argv);
+
+    KLocalizedString::setApplicationDomain("kmid");
 
     KAboutData about(
         QStringLiteral("kmid"),
