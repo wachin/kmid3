@@ -39,7 +39,7 @@ sudo apt-get install -y libkf5doctools-dev
 ## Cómo compilar e instalar
 
 ```bash
-cd /home/wachin/Dev/kmid2/kmid-2.4.0
+cd /ruta/a/kmid3
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
 cmake --build . -j"$(nproc)"
@@ -50,13 +50,73 @@ Para instalar en el mismo prefijo que el resto de KDE/Qt del sistema, muchos emp
 
 Con `cmake --install`, el ejecutable **`kmid`**, **`libkmidbackend.so`**, **`kmid_alsa.so`** y **`kmid_part.so`** quedan en las rutas estándar del prefijo para que se carguen el backend ALSA y el KPart.
 
-### Probar sin instalar
+---
+
+## Requisito: sintetizador de software
+
+KMid necesita un sintetizador MIDI para producir sonido. En Linux la opción más común es **TiMidity++** con una soundfont.
+
+### Instalar TiMidity y la soundfont
 
 ```bash
-LD_LIBRARY_PATH=/ruta/al/build/bin /ruta/al/build/bin/kmid
+sudo apt-get install timidity fluid-soundfont-gm alsa-utils
 ```
 
-Ajusta la ruta a tu directorio `build`.
+El paquete `fluid-soundfont-gm` es necesario para que TiMidity tenga los instrumentos virtuales. Sin él aparece este error al arrancar:
+
+```
+/etc/timidity/fluidr3_gm.cfg: No such file or directory
+timidity: Error reading configuration file.
+```
+
+### Cargar el soporte de secuenciador ALSA
+
+```bash
+modprobe snd_seq
+```
+
+Este comando activa el módulo del kernel que crea los puertos MIDI virtuales internos, necesarios para que KMid y TiMidity se comuniquen.
+
+### Arrancar TiMidity en modo servidor
+
+```bash
+timidity -iA -Os -B2,8 &
+```
+
+Esto lanza TiMidity en segundo plano como sintetizador virtual con puertos ALSA abiertos. Deberías ver algo como:
+
+```
+Requested buffer size 2048, fragment size 1024
+ALSA pcm 'default' set buffer size 2048, period size 1024 bytes
+TiMidity starting in ALSA server mode
+Opening sequencer port: 128:0 128:1 128:2 128:3
+```
+
+Puedes verificar que los puertos están activos con:
+
+```bash
+aconnect -l
+```
+
+Deberías ver `client 128: 'TiMidity'` en la lista.
+
+### Lanzar KMid
+
+```bash
+kmid
+```
+
+KMid detectará automáticamente los puertos ALSA de TiMidity y cargará el backend. Si `/usr/local/bin` no está en tu PATH:
+
+```bash
+/usr/local/bin/kmid
+```
+
+### Detener TiMidity cuando termines
+
+```bash
+killall timidity
+```
 
 ---
 
@@ -66,6 +126,7 @@ Ajusta la ruta a tu directorio `build`.
 - **Drumstick**: includes `<drumstick/…>`, `using namespace drumstick::ALSA`, `drumstick::File::QSmf`, `#include <drumstick/sequencererror.h>`, `-fexceptions` en el plugin ALSA.
 - **Tipos**: `Settings` de KConfig es global (no `KMid::Settings`); `KDE_EXPORT` eliminado en `ALSABackend`; `VERSION` en `config.h` desde `@PROJECT_VERSION@`.
 - **Qt5/KF5 UI**: cabeceras tipo `KColorButton`, `QFontComboBox`/`QSpinBox` donde KF5 ya no expone el widget antiguo; `QListWidget` + conexión en código para la lista MIDI.
+- **main.cpp**: añadido `KLocalizedString::setApplicationDomain("kmid")` y `QCoreApplication::addLibraryPath` para que Qt encuentre los plugins instalados en `/usr/local`.
 - **Otros**: `QProcess` en sustitución de `KProcess`/`KUrl`; `sendSeqEvent` para no chocar con `QObject::sendEvent`; `setRotation`, `itemAt(..., QTransform())`, `Qt5::Svg`, etc.
 
 ---
@@ -74,3 +135,4 @@ Ajusta la ruta a tu directorio `build`.
 
 - Los avisos de **iconos** (`hi16-app-kmid.png` frente al formato que espera `ecm_install_icons`) son cosméticos; se pueden renombrar más adelante si quieres silenciar ECM.
 - Si al ejecutar falta algún `.so` o plugin en tiempo de ejecución, indica el mensaje exacto de la terminal y se puede resolver ajustando el prefijo de instalación o con `LD_LIBRARY_PATH` / `QT_PLUGIN_PATH`.
+- Si instalas con `-DCMAKE_INSTALL_PREFIX=/usr/local` y el sistema no encuentra `kmid` en el PATH, añade `/usr/local/bin` a tu PATH: `export PATH="/usr/local/bin:$PATH"`.

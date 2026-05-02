@@ -11,7 +11,9 @@ cmake_install.cmake
 CTestTestfile.cmake
 ecm_uninstall.cmake
 Makefile
-install_manifest.txt
+# install_manifest.txt is intentionally tracked to allow uninstalling
+# Remove this exception if you don't want to track it
+# install_manifest.txt
 compile_commands.json
 prefix.sh
 
