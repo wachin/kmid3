@@ -6,23 +6,14 @@
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #include "song.h"
 #include <QTextDecoder>
-#include <KEncodingProber>
-#include <KGlobal>
-#include <KCharsets>
-#include <KDebug>
+#include <QTextCodec>
+#include <QRegularExpression>
+#include <QDebug>
+#include <algorithm>
 
 namespace KMid {
 
@@ -38,7 +29,7 @@ namespace KMid {
 
     void Song::sort()
     {
-        qStableSort(begin(), end(), eventLessThan);
+        std::stable_sort(begin(), end(), eventLessThan);
     }
 
     void Song::clear()
@@ -72,24 +63,12 @@ namespace KMid {
                 return; // ignored
             if ((text.length() > 1) && (text[0] == '@')) {
                 switch(text[1]) {
-                case 'K':
-                    t = KarFileType;
-                    break;
-                case 'V':
-                    t = KarVersion;
-                    break;
-                case 'I':
-                    t = KarInformation;
-                    break;
-                case 'L':
-                    t = KarLanguage;
-                    break;
-                case 'T':
-                    t = KarTitles;
-                    break;
-                case 'W':
-                    t = KarWarnings;
-                    break;
+                case 'K': t = KarFileType; break;
+                case 'V': t = KarVersion; break;
+                case 'I': t = KarInformation; break;
+                case 'L': t = KarLanguage; break;
+                case 'T': t = KarTitles; break;
+                case 'W': t = KarWarnings; break;
                 }
             }
             m_text[t][tick].append(text);
@@ -99,10 +78,10 @@ namespace KMid {
     void Song::appendStringToList(QStringList &list, QString &s, TextType type)
     {
         if (type == Text || type >= KarFileType)
-            s.replace(QRegExp("@[IKLTVW]"), QString(QChar::LineSeparator));
+            s.replace(QRegularExpression("@[IKLTVW]"), QString(QChar::LineSeparator));
         if (type == Text || type == Lyric)
-            s.replace(QRegExp("[/\\\\]+"), QString(QChar::LineSeparator));
-        s.replace(QRegExp("[\r\n]+"), QString(QChar::LineSeparator));
+            s.replace(QRegularExpression("[/\\\\]+"), QString(QChar::LineSeparator));
+        s.replace(QRegularExpression("[\r\n]+"), QString(QChar::LineSeparator));
         list.append(s);
     }
 
@@ -113,8 +92,8 @@ namespace KMid {
 
     QString Song::decodeBytes(const QByteArray &ba)
     {
-        if (m_codec == NULL )
-            return QString::fromAscii(ba);
+        if (m_codec == nullptr)
+            return QString::fromLatin1(ba);
         return m_codec->toUnicode(ba);
     }
 
@@ -122,7 +101,7 @@ namespace KMid {
     {
         QStringList list;
         if ( (type >= FIRST_TYPE) && (type <= LAST_TYPE) ) {
-            foreach(const QByteArray &a, m_text[type]) {
+            for (const QByteArray &a : m_text[type]) {
                 QString s = decodeBytes(a);
                 appendStringToList(list, s, type);
             }
@@ -159,7 +138,8 @@ namespace KMid {
 
     bool Song::guessTextCodec()
     {
-        KEncodingProber prober;
+        // Simple heuristic: try UTF-8 first, then fall back to Latin-1
+        QByteArray allText;
         TimeStampedData::const_iterator it, end;
         if (m_text[Lyric].empty()) {
             it = m_text[Text].constBegin();
@@ -170,16 +150,24 @@ namespace KMid {
         }
         if (it == end)
             return false;
-        for (; it != end; ++it )
-            prober.feed( it.value() );
-        if ( prober.confidence() > 0.6 ) {
-            QTextCodec *codec = QTextCodec::codecForName(prober.encodingName());
-            if (codec == NULL)
-                kWarning() << "Unsupported encoding detected:" << prober.encodingName();
-            else {
-                setTextCodec(codec);
+        for (; it != end; ++it)
+            allText.append(it.value());
+
+        // Try UTF-8
+        QTextCodec *utf8 = QTextCodec::codecForName("UTF-8");
+        if (utf8) {
+            QTextCodec::ConverterState state;
+            utf8->toUnicode(allText.constData(), allText.size(), &state);
+            if (state.invalidChars == 0) {
+                setTextCodec(utf8);
                 return true;
             }
+        }
+        // Default to Latin-1
+        QTextCodec *latin1 = QTextCodec::codecForName("ISO-8859-1");
+        if (latin1) {
+            setTextCodec(latin1);
+            return true;
         }
         return false;
     }

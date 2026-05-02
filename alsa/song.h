@@ -22,14 +22,14 @@
 
 #include <QStringList>
 #include <QMap>
-#include <alsaevent.h>
+#include <drumstick/alsaevent.h>
 #include "midiobject.h"
 
 class QTextCodec;
 
-using namespace drumstick;
-
 namespace KMid {
+
+using namespace drumstick::ALSA;
 
     class Song : public QList<SequencerEvent*>
     {

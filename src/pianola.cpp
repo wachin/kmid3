@@ -6,15 +6,6 @@
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #include "pianola.h"
@@ -27,29 +18,29 @@
 #include <QFrame>
 #include <QLabel>
 #include <QFont>
-#include <KGlobalSettings>
-#include <KLocale>
-#include <KMenuBar>
+#include <QMenuBar>
 #include <KToggleAction>
+#include <KLocalizedString>
+#include <KMainWindow>
 
 Pianola::Pianola( QWidget* parent ) : KMainWindow(parent)
 {
     setObjectName("PlayerPianoWindow");
     setAttribute(Qt::WA_DeleteOnClose, false);
-    setCaption(i18nc("@title:window","Player Piano"));
+    setWindowTitle(i18nc("@title:window","Player Piano"));
     m_piano.resize(MIDI_CHANNELS);
     m_action.resize(MIDI_CHANNELS);
     m_frame.resize(MIDI_CHANNELS);
     m_label.resize(MIDI_CHANNELS);
     m_mapper = new QSignalMapper(this);
     QMenu* chmenu = menuBar()->addMenu(i18nc("@title:menu","MIDI Channels"));
-    KAction *a = new KAction(this);
+    QAction *a = new QAction(this);
     a->setText(i18nc("@action:inmenu","Show all channels"));
-    connect(a, SIGNAL(activated()), SLOT(slotShowAllChannels()));
+    connect(a, SIGNAL(triggered()), SLOT(slotShowAllChannels()));
     chmenu->addAction(a);
-    a = new KAction(this);
+    a = new QAction(this);
     a->setText(i18nc("@action:inmenu","Hide all channels"));
-    connect(a, SIGNAL(activated()), SLOT(slotHideAllChannels()));
+    connect(a, SIGNAL(triggered()), SLOT(slotHideAllChannels()));
     chmenu->addAction(a);
     QVBoxLayout *vlayout = new QVBoxLayout;
     vlayout->setSpacing(0);
@@ -80,7 +71,7 @@ Pianola::Pianola( QWidget* parent ) : KMainWindow(parent)
         m_frame[i]->setVisible(false);
         m_action[i] = new KToggleAction(this);
         m_action[i]->setText(i18nc("@item:inmenu","Channel %1", i+1));
-        connect(m_action[i], SIGNAL(activated()), m_mapper, SLOT(map()));
+        connect(m_action[i], SIGNAL(triggered()), m_mapper, SLOT(map()));
         m_mapper->setMapping(m_action[i], i);
         chmenu->addAction(m_action[i]);
     }
@@ -101,9 +92,9 @@ bool Pianola::queryClose()
 void Pianola::allNotesOff()
 {
     for (int ch = 0; ch < MIDI_CHANNELS; ++ch )
-        if (m_action.at(ch) != NULL && m_action[ch]->isChecked())
+        if (m_action.at(ch) != nullptr && m_action[ch]->isChecked())
             for( int n = 0; n < 128; ++n )
-                if (m_piano.at(ch) != NULL)
+                if (m_piano.at(ch) != nullptr)
                     m_piano[ch]->showNoteOff(n);
 }
 
@@ -140,7 +131,7 @@ void Pianola::slotNoteOn(int channel, int note, int vel)
             m_piano[channel]->showNoteOff(note);
         else
             m_piano[channel]->showNoteOn(note);
-	}
+    }
 }
 
 void Pianola::slotNoteOff(int channel, int note, int /*vel*/)
@@ -152,7 +143,7 @@ void Pianola::slotNoteOff(int channel, int note, int /*vel*/)
 void Pianola::playNoteOn(int note)
 {
     PianoKeybd* p = static_cast<PianoKeybd*>(sender());
-    if (p != NULL) {
+    if (p != nullptr) {
         int channel = m_piano.indexOf(p);
         emit noteOn(channel, note, 110);
     }
@@ -161,7 +152,7 @@ void Pianola::playNoteOn(int note)
 void Pianola::playNoteOff(int note)
 {
     PianoKeybd* p = static_cast<PianoKeybd*>(sender());
-    if (p != NULL) {
+    if (p != nullptr) {
         int channel = m_piano.indexOf(p);
         emit noteOff(channel, note, 0);
     }
@@ -207,5 +198,4 @@ void Pianola::slotLabel(int channel, const QString& text)
     if (m_action[channel]->isEnabled())
         m_label[channel]->setText(text);
 }
-
 #include "pianola.moc"

@@ -26,9 +26,9 @@
 
 class QSignalMapper;
 class QToolButton;
-class KComboBox;
+class QComboBox;
 class Vumeter;
-class KLineEdit;
+class QLineEdit;
 
 class Channels : public KMainWindow {
     Q_OBJECT
@@ -88,8 +88,8 @@ private:
     QToolButton* m_solo[MIDI_CHANNELS];
     QToolButton* m_lock[MIDI_CHANNELS];
     Vumeter* m_vumeter[MIDI_CHANNELS];
-    KComboBox* m_patch[MIDI_CHANNELS];
-    KLineEdit* m_name[MIDI_CHANNELS];
+    QComboBox* m_patch[MIDI_CHANNELS];
+    QLineEdit* m_name[MIDI_CHANNELS];
     QSignalMapper* m_muteMapper;
     QSignalMapper* m_soloMapper;
     QSignalMapper* m_patchMapper;

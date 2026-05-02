@@ -21,12 +21,12 @@
 #define INCLUDED_PLAYER_H
 
 #include <QObject>
-#include <playthread.h>
+#include <drumstick/playthread.h>
 #include "song.h"
 
-using namespace drumstick;
-
 namespace KMid {
+
+using namespace drumstick::ALSA;
 
     class Player : public SequencerOutputThread
     {

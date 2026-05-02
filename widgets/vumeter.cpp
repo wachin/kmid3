@@ -19,10 +19,10 @@
 
 #include "vumeter.h"
 
-#include <QtGui/QImage>
-#include <QtGui/QPainter>
-#include <QtGui/QBrush>
-#include <QtGui/QPen>
+#include <QImage>
+#include <QPainter>
+#include <QBrush>
+#include <QPen>
 #include <QtCore/QDebug>
 
 Vumeter::Vumeter(QWidget *parent) :

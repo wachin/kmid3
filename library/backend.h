@@ -28,9 +28,9 @@
 #include <QString>
 #include <QVariantList>
 
-namespace KMid {
+class Settings;
 
-    class Settings;
+namespace KMid {
 
     class KMIDBACKEND_EXPORT Backend : public QObject
     {

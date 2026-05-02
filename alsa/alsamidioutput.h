@@ -22,15 +22,11 @@
 
 #include "midioutput.h"
 #include <QObject>
-
-namespace drumstick {
-    class MidiClient;
-    class MidiPort;
-    class SequencerEvent;
-}
-using namespace drumstick;
+#include <drumstick/alsaclient.h>
 
 namespace KMid {
+
+using namespace drumstick::ALSA;
 
     class ALSAMIDIOutput : public MIDIOutput {
         Q_OBJECT
@@ -71,7 +67,7 @@ namespace KMid {
         void sendChannelPressure(int chan, int value);
         void sendPitchBend(int chan, int value);
         void sendSysexEvent(const QByteArray& data);
-        void sendEvent(SequencerEvent *ev, bool discardable = true);
+        void sendSeqEvent(SequencerEvent *ev, bool discardable = true);
         void sendInitialProgram(int channel, int value);
 
     private:

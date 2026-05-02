@@ -1,0 +1,7 @@
+{
+    "KPlugin": {
+        "Id": "kmid_alsa",
+        "Name": "ALSA Sequencer Backend",
+        "ServiceTypes": ["KMid/backend"]
+    }
+}

@@ -1,102 +1,91 @@
-project (kmid)
+cmake_minimum_required(VERSION 3.16)
+project(kmid VERSION 2.4.0)
 
-set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-set(VERSION 2.4.0)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
-# Building standalone ?
-if (NOT KDE4_FOUND)
-  set(BUILDING_STANDALONE true)
-  find_package (KDE4 REQUIRED)
-  include (KDE4Defaults)
-endif (NOT KDE4_FOUND)
+# Find Qt5
+find_package(Qt5 REQUIRED COMPONENTS
+    Core
+    Gui
+    Widgets
+    DBus
+    PrintSupport
+    Network
+    Svg
+)
 
-include_directories ( ${KDE4_INCLUDES} ${QT_INCLUDES} )
+# Find KDE Frameworks 5
+find_package(ECM 5.80 REQUIRED NO_MODULE)
+set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-# Linux ?
-if ( CMAKE_SYSTEM MATCHES "Linux")
-  find_package (PkgConfig)
-  if (PKG_CONFIG_FOUND)
-    # Check for ALSA 1.0
-    pkg_check_modules (ALSA alsa>=1.0)
-    if (ALSA_FOUND)
-      set ( WITH_ALSA 1 )
-      set ( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${KDE4_ENABLE_EXCEPTIONS}" )
-      # Check for DRUMSTICK
-      pkg_check_modules(DRUMSTICK-FILE drumstick-file>=0.4)
-      pkg_check_modules(DRUMSTICK-ALSA drumstick-alsa>=0.4)
-      if (DRUMSTICK-ALSA_FOUND AND DRUMSTICK-FILE_FOUND)
-        set ( DRUMSTICK_LIBRARIES
-          ${DRUMSTICK-FILE_LIBRARIES}
-          ${DRUMSTICK-ALSA_LIBRARIES}
-          ${ALSA_LIBRARIES}
-        )
-        set ( DRUMSTICK_INCLUDEDIR
-          ${DRUMSTICK-FILE_INCLUDEDIR}
-          ${DRUMSTICK-ALSA_INCLUDEDIR}
-        )
-      else (DRUMSTICK-ALSA_FOUND AND DRUMSTICK-FILE_FOUND)
-        # build the local copy
-        add_definitions (-DDRUMSTICK_STATIC)
-        set (DRUMSTICK_LIBRARIES drumstick-file drumstick-alsa ${ALSA_LIBRARIES})
-        set (DRUMSTICK_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/drumstick/include")
-        add_subdirectory (drumstick)
-      endif (DRUMSTICK-ALSA_FOUND AND DRUMSTICK-FILE_FOUND)
-    endif (ALSA_FOUND)
-  endif (PKG_CONFIG_FOUND)
-endif ( CMAKE_SYSTEM MATCHES "Linux")
+include(KDEInstallDirs)
+include(KDECMakeSettings)
+include(KDECompilerSettings NO_POLICY_SCOPE)
+include(FeatureSummary)
 
-# Mac OSX ?
-if ( CMAKE_SYSTEM MATCHES "Darwin")
-  include(CheckIncludeFile)
-  check_include_file(CoreMIDI/MIDIServices.h WITH_COREMIDI)
-  check_include_file(CoreAudio/AudioHardware.h WITH_COREAUDIO)
-endif ( CMAKE_SYSTEM MATCHES "Darwin")
+find_package(KF5 REQUIRED COMPONENTS
+    CoreAddons
+    I18n
+    XmlGui
+    KIO
+    Parts
+    Config
+    ConfigWidgets
+    WidgetsAddons
+    TextWidgets
+    IconThemes
+    Notifications
+)
 
-# Windows ?
-if ( CMAKE_SYSTEM MATCHES "Windows" )
-  include(CheckIncludeFiles)
-  check_include_files ( windows.h WINDOWS_FOUND )
-  if (WINDOWS_FOUND)
-    check_include_files( "windows.h;mmsystem.h" WITH_WINMM )
-  endif (WINDOWS_FOUND)
-  # PkgConfig in windows, TODO: better check
-  find_package (PkgConfig)
-  if (PKG_CONFIG_FOUND)
-    # Check for drumstick-file
-    pkg_check_modules(DRUMSTICK drumstick-file>=0.4)
-  endif (PKG_CONFIG_FOUND)
-  if (NOT DRUMSTICK_FOUND)
-    add_definitions (-DDRUMSTICK_STATIC)
-    set (DRUMSTICK_LIBRARIES drumstick-file)
-    set (DRUMSTICK_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/drumstick/include")
-    add_subdirectory (drumstick)
-  endif (NOT DRUMSTICK_FOUND)
-endif ( CMAKE_SYSTEM MATCHES "Windows" )
+# Linux / ALSA
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ALSA alsa>=1.0)
+    if(ALSA_FOUND)
+        set(WITH_ALSA 1)
+        # Check for drumstick (Qt5 version, Debian package names without "2" suffix)
+        pkg_check_modules(DRUMSTICK_FILE drumstick-file>=1.0)
+        pkg_check_modules(DRUMSTICK_ALSA drumstick-alsa>=1.0)
+        if(DRUMSTICK_ALSA_FOUND AND DRUMSTICK_FILE_FOUND)
+            set(DRUMSTICK_LIBRARIES
+                ${DRUMSTICK_FILE_LIBRARIES}
+                ${DRUMSTICK_ALSA_LIBRARIES}
+                ${ALSA_LIBRARIES}
+            )
+            set(DRUMSTICK_INCLUDEDIR
+                ${DRUMSTICK_FILE_INCLUDE_DIRS}
+                ${DRUMSTICK_ALSA_INCLUDE_DIRS}
+            )
+            message(STATUS "Found system drumstick: ${DRUMSTICK_FILE_VERSION}")
+        else()
+            message(FATAL_ERROR "drumstick-file and drumstick-alsa are required. Install libdrumstick-dev.")
+        endif()
+    endif()
+endif()
 
-# common backend classes
-add_subdirectory ( library )
+include_directories(${DRUMSTICK_INCLUDEDIR})
 
-# Main program
-add_subdirectory ( src )
+add_subdirectory(library)
+add_subdirectory(src)
 
-# Platform native backends
-if (ALSA_FOUND)
-  add_subdirectory (alsa)
-endif (ALSA_FOUND)
+if(ALSA_FOUND)
+    add_subdirectory(alsa)
+endif()
 
-if (WITH_COREAUDIO AND WITH_COREMIDI)
-  add_subdirectory ( mac )
-endif (WITH_COREAUDIO AND WITH_COREMIDI)
-
-if ( WINDOWS_FOUND AND WITH_WINMM )
-  add_subdirectory ( win )
-endif ( WINDOWS_FOUND AND WITH_WINMM )
-
-# Test backend
-# macro_optional_add_subdirectory ( dummy )
-
-add_subdirectory ( icons )
-add_subdirectory ( maps )
-add_subdirectory ( examples )
+add_subdirectory(icons)
+add_subdirectory(maps)
+add_subdirectory(examples)
 add_subdirectory(po)
-add_subdirectory(doc)
+
+find_package(KF5DocTools 5.80 QUIET)
+if(KF5DocTools_FOUND)
+    add_subdirectory(doc)
+else()
+    message(STATUS "KF5DocTools not found — skipping HTML handbooks (Debian: apt install libkf5doctools-dev)")
+endif()
+
+feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)

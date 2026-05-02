@@ -6,29 +6,23 @@
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #ifndef PLAYLISTDIALOG_H
 #define PLAYLISTDIALOG_H
 
-#include "kdialog.h"
+#include <QDialog>
+#include <QListWidget>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
 
-class KUrlRequester;
-class KEditListBox;
-
-class PlayListDialog : public KDialog {
+class PlayListDialog : public QDialog {
     Q_OBJECT
 public:
-    PlayListDialog(QWidget *parent = 0);
+    PlayListDialog(QWidget *parent = nullptr);
     virtual ~PlayListDialog();
 
     void setItems(const QStringList& items);
@@ -40,9 +34,18 @@ public:
 public slots:
     void reset();
 
+private slots:
+    void addItem();
+    void removeItem();
+
 private:
-    KUrlRequester *m_requester;
-    KEditListBox *m_listBox;
+    QListWidget *m_listWidget;
+    QLineEdit *m_lineEdit;
+    QPushButton *m_addBtn;
+    QPushButton *m_removeBtn;
+    QPushButton *m_okBtn;
+    QPushButton *m_cancelBtn;
+    QPushButton *m_resetBtn;
 };
 
 #endif /* PLAYLISTDIALOG_H */

@@ -22,10 +22,11 @@
 #include "midioutput.h"
 
 #include <KConfigSkeleton>
-#include <KMessageBox>
-#include <KStandardDirs>
-#include <KLocale>
+
+#include <QStandardPaths>
+#include <KLocalizedString>
 #include <QTextStream>
+#include <QRegularExpression>
 #include <QFileInfo>
 
 const int STARTUP_TIMEOUT(1000);
@@ -103,11 +104,11 @@ QString ExternalSoftSynth::parseVersion(const QString& out )
     if( pos < 0 )
         return QString();
 
-    int sPos = out.indexOf( QRegExp("\\d"), pos );
+    int sPos = out.indexOf( QRegularExpression("\\d"), pos );
     if( sPos < 0 )
         return QString();
 
-    int endPos = out.indexOf( QRegExp("[\\s,]"), sPos + 1 );
+    int endPos = out.indexOf( QRegularExpression("[\\s,]"), sPos + 1 );
     if( endPos < 0 )
         return QString();
 
@@ -139,7 +140,7 @@ QStringList ExternalSoftSynth::readText()
 
 void ExternalSoftSynth::terminate()
 {
-    if (m_process.state() == KProcess::Running) {
+    if (m_process.state() == QProcess::Running) {
         m_process.disconnect();
         m_process.kill();
         m_process.waitForFinished(STARTUP_TIMEOUT);
@@ -149,16 +150,16 @@ void ExternalSoftSynth::terminate()
 void ExternalSoftSynth::timerEvent(QTimerEvent* event)
 {
     Q_UNUSED(event);
-    if ( m_process.state() == KProcess::Starting )
+    if ( m_process.state() == QProcess::Starting )
         return;
     m_ready = isOutputReady();
-    if (m_ready || (m_process.state() != KProcess::Running ) ) {
+    if (m_ready || (m_process.state() != QProcess::Running ) ) {
         if (m_timerId != 0) {
             killTimer(m_timerId);
             m_timerId = 0;
         }
         m_thread.quit();
-        if ((m_process.state() == KProcess::Running))
+        if ((m_process.state() == QProcess::Running))
             emit synthReady(m_prettyName, m_warnings);
     }
 }
@@ -185,7 +186,7 @@ void ExternalSoftSynth::start(bool waiting)
     m_warnings.clear();
     m_process.start();
     m_thread.start();
-    if ((m_process.state() == KProcess::Running) && waiting)
+    if ((m_process.state() == QProcess::Running) && waiting)
         m_thread.wait();
 }
 
@@ -222,19 +223,21 @@ TimiditySoftSynth::~TimiditySoftSynth()
 
 void TimiditySoftSynth::check()
 {
-    KProcess timidity;
-    KUrl u = m_settings->cmd_timidity();
-    QString cmd = KGlobal::dirs()->findExe(u.toLocalFile());
+    QProcess timidity;
+    const QString local = m_settings->cmd_timidity().toLocalFile();
+    const QString cmd = (!local.isEmpty() && QFileInfo(local).isExecutable())
+        ? local
+        : QStandardPaths::findExecutable(QFileInfo(local).fileName());
     m_Ok = false;
     m_version.clear();
     if (cmd.isEmpty())
         return;
-    timidity.setOutputChannelMode( KProcess::MergedChannels );
-    timidity << cmd << "--version";
-    if( timidity.execute( STARTUP_TIMEOUT ) >= 0 ) {
-        QString s = QString::fromLocal8Bit( timidity.readAll() );
+    timidity.setProcessChannelMode(QProcess::MergedChannels);
+    timidity.start(cmd, QStringList() << QStringLiteral("--version"));
+    if (timidity.waitForFinished(STARTUP_TIMEOUT) && timidity.exitStatus() == QProcess::NormalExit) {
+        const QString s = QString::fromLocal8Bit(timidity.readAllStandardOutput());
         m_version = parseVersion(s);
-        QString copyright = parseCopyright(s);
+        const QString copyright = parseCopyright(s);
         m_Ok = !m_version.isEmpty() && !copyright.isEmpty();
     }
 }
@@ -242,7 +245,7 @@ void TimiditySoftSynth::check()
 void TimiditySoftSynth::start(bool waiting)
 {
     QStringList args;
-    if ( m_process.state() == KProcess::NotRunning && m_Ok ) {
+    if ( m_process.state() == QProcess::NotRunning && m_Ok ) {
         args += "-iA";
         switch (m_settings->audio_timidity()) {
         case Settings::timidity_alsa:
@@ -266,7 +269,7 @@ void TimiditySoftSynth::start(bool waiting)
         if (!m_settings->rate_timidity().isEmpty())
             args += ("-s" + m_settings->rate_timidity());
         if (!m_settings->args_timidity().isEmpty())
-            args += m_settings->args_timidity().split(QRegExp("\\s+"));
+            args += m_settings->args_timidity().split(QRegularExpression("\\s+"));
 
         connect( &m_process, SIGNAL(finished(int, QProcess::ExitStatus)),
                  SLOT(slotProcessFinished(int, QProcess::ExitStatus)) );
@@ -274,8 +277,8 @@ void TimiditySoftSynth::start(bool waiting)
                  SLOT(slotReadStandardError()) );
 
         m_settings->setOutput_connection(QLatin1String("TiMidity:0"));
-        m_process.setOutputChannelMode( KProcess::OnlyStderrChannel );
-        m_process.setProgram(m_settings->cmd_timidity().toLocalFile(), args);
+        m_process.setProgram(m_settings->cmd_timidity().toLocalFile());
+        m_process.setArguments(args);
         ExternalSoftSynth::start(waiting);
     }
 }
@@ -317,17 +320,19 @@ FluidSoftSynth::~FluidSoftSynth()
 
 void FluidSoftSynth::check()
 {
-    KProcess fluidsynth;
-    KUrl u = m_settings->cmd_fluid();
-    QString cmd = KGlobal::dirs()->findExe(u.toLocalFile());
+    QProcess fluidsynth;
+    const QString local = m_settings->cmd_fluid().toLocalFile();
+    const QString cmd = (!local.isEmpty() && QFileInfo(local).isExecutable())
+        ? local
+        : QStandardPaths::findExecutable(QFileInfo(local).fileName());
     m_Ok = false;
     m_version.clear();
     if (cmd.isEmpty())
         return;
-    fluidsynth.setOutputChannelMode( KProcess::MergedChannels );
-    fluidsynth << cmd << "--version";
-    if( fluidsynth.execute( STARTUP_TIMEOUT ) >= 0 ) {
-        QString s = QString::fromLocal8Bit( fluidsynth.readAll() );
+    fluidsynth.setProcessChannelMode(QProcess::MergedChannels);
+    fluidsynth.start(cmd, QStringList() << QStringLiteral("--version"));
+    if (fluidsynth.waitForFinished(STARTUP_TIMEOUT) && fluidsynth.exitStatus() == QProcess::NormalExit) {
+        const QString s = QString::fromLocal8Bit(fluidsynth.readAllStandardOutput());
         m_version = parseVersion(s);
         m_Ok = !m_version.isEmpty() && !m_settings->sf2_fluid().isEmpty();
         m_Ok &= (versionNumber(m_version) >= 0x010009U);
@@ -339,7 +344,7 @@ void FluidSoftSynth::check()
 void FluidSoftSynth::start(bool waiting)
 {
     QStringList args;
-    if ( m_process.state() == KProcess::NotRunning && m_Ok ) {
+    if ( m_process.state() == QProcess::NotRunning && m_Ok ) {
         args += "--disable-lash";
         args += "--portname=FluidSynth";
         args += "--midi-driver=alsa_seq";
@@ -367,7 +372,7 @@ void FluidSoftSynth::start(bool waiting)
         if (!m_settings->rate_fluid().isEmpty())
             args += ("--sample-rate=" + m_settings->rate_fluid());
         if (!m_settings->args_fluid().isEmpty()) {
-            QStringList args_fluid = m_settings->args_fluid().split(QRegExp("\\s+"));
+            QStringList args_fluid = m_settings->args_fluid().split(QRegularExpression("\\s+"));
             foreach( const QString& arg, args_fluid)
                 if (arg != "-i" && arg != "--no-shell")
                     args += arg;
@@ -380,8 +385,8 @@ void FluidSoftSynth::start(bool waiting)
                  SLOT(slotReadStandardError()) );
 
         m_settings->setOutput_connection(QLatin1String("FluidSynth:0"));
-        m_process.setOutputChannelMode( KProcess::OnlyStderrChannel );
-        m_process.setProgram(m_settings->cmd_fluid().toLocalFile(), args);
+        m_process.setProgram(m_settings->cmd_fluid().toLocalFile());
+        m_process.setArguments(args);
         ExternalSoftSynth::start(waiting);
     }
 }
@@ -399,3 +404,4 @@ void FluidSoftSynth::slotProcessFinished(int exitCode, QProcess::ExitStatus exit
     m_settings->setExec_fluid(false);
     emit synthErrors(m_prettyName, m_warnings);
 }
+#include "externalsoftsynth.moc"

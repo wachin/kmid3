@@ -1,24 +1,14 @@
 /*
-    KMid2 MIDI/Karaoke Player
+    KMid2 MIDI/Karaoke Player - Updated for KDE5/Qt5
     Copyright (C) 2009-2010 Pedro Lopez-Cabanillas <plcl@users.sf.net>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #include "kmid_part.h"
-#include "kmid_part.moc"
 #include "kmid_partview.h"
 #include "kmidpartadaptor.h"
 #include "backend.h"
@@ -26,27 +16,22 @@
 #include "settings.h"
 #include "midimapper.h"
 
-#include <KAction>
 #include <KToggleAction>
 #include <KActionCollection>
-#include <KComponentData>
 #include <KAboutData>
-#include <KFileDialog>
-#include <KStandardAction>
+#include <KLocalizedString>
 #include <KMessageBox>
 #include <KPluginFactory>
-#include <KPluginLoader>
-#include <KLocale>
 
-#include <QtCore/QFile>
-#include <QtCore/QTextStream>
-#include <QtCore/QMutex>
-#include <QtCore/QMutexLocker>
-#include <QtDBus/QtDBus>
-#include <QtGui/QTextEdit>
+#include <QFile>
+#include <QTextStream>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QDBusConnection>
+#include <QTextEdit>
+#include <QAction>
 
-K_PLUGIN_FACTORY( KMidPartFactory, registerPlugin<KMidPart>(); )
-K_EXPORT_PLUGIN( KMidPartFactory("kmid_part") )
+K_PLUGIN_FACTORY_WITH_JSON(KMidPartFactory, "kmid_part.json", registerPlugin<KMidPart>();)
 
 struct MidiBackend {
     QString  library;
@@ -59,19 +44,19 @@ public:
     KMidPartPrivate(KMidPart *parent, QWidget *parentWidget) :
         q(parent),
         m_parentWidget(parentWidget),
-        m_view(0),
-        m_loader(0),
-        m_currentBackend(0),
-        m_midiobj(0),
-        m_midiout(0),
-        m_settings(new KMid::Settings),
+        m_view(nullptr),
+        m_loader(nullptr),
+        m_currentBackend(nullptr),
+        m_midiobj(nullptr),
+        m_midiout(nullptr),
+        m_settings(new Settings),
         m_mapper(new KMid::MidiMapper),
         m_autoStart(true),
         m_volfactor(1.0),
         m_playerReady(false),
         m_playPending(false)
     {
-        if (parentWidget != 0)
+        if (parentWidget != nullptr)
             m_view = new KMidPartView(parentWidget);
     }
 
@@ -87,11 +72,11 @@ public:
     KMid::Backend *m_currentBackend;
     KMid::MIDIObject *m_midiobj;
     KMid::MIDIOutput *m_midiout;
-    KMid::Settings *m_settings;
+    Settings *m_settings;
     KMid::MidiMapper *m_mapper;
     KToggleAction *m_pause;
-    KAction *m_play;
-    KAction *m_stop;
+    QAction *m_play;
+    QAction *m_stop;
     QByteArray m_resetMessage;
     QList<MidiBackend> m_backends;
     QString m_currentBackendLibrary;
@@ -102,60 +87,43 @@ public:
     QMutex m_connmutex;
 };
 
-KMidPart::KMidPart( QWidget *parentWidget, QObject *parent, const QVariantList& args )
-    : KMediaPlayer::Player(parentWidget, "KMidPlayer", parent)
+KMidPart::KMidPart(QWidget *parentWidget, QObject *parent, const QVariantList& args)
+    : KParts::ReadOnlyPart(parent)
 {
-    kDebug() << "KMediaPlayer/Player constructor"
-             << "parentWidget:" << parentWidget
-             << "parent:" << parent;
-    if (parentWidget == 0)
+    if (parentWidget == nullptr)
         parentWidget = qobject_cast<QWidget*>(parent);
     d = new KMidPartPrivate(this, parentWidget);
-    setComponentData( KMidPartFactory::componentData() );
     (void) new KMidPartAdaptor(this);
     QDBusConnection::sessionBus().registerObject(QLatin1String("/KMidPart"), this);
     setupActions();
     setXMLFile("kmid_part.rc");
-    setWidget(d->m_view);
+    if (d->m_view)
+        setWidget(d->m_view);
     initialize();
-    foreach (const QVariant& v, args) {
-    	QString a = v.toString().toLower();
-    	int p = a.indexOf('=');
-    	if (p > -1) {
-    		QString key = a.left(p);
-    		QString val = a.mid(p+1);
-    		val = val.remove('"');
-    		val = val.remove('\'');
-    		if (key == "autostart") {
-    			setAutoStart( val == "true" );
-    		} else if (key == "loop") {
-    			setLooping( val == "true" );
-    		} else if (key == "volume") {
-    			double v = val.toDouble() / 100.0;
-  				setVolumeFactor(v);
-    		}
-    	}
+    for (const QVariant& v : args) {
+        QString a = v.toString().toLower();
+        int p = a.indexOf('=');
+        if (p > -1) {
+            QString key = a.left(p);
+            QString val = a.mid(p+1);
+            val = val.remove('"');
+            val = val.remove('\'');
+            if (key == "autostart") {
+                setAutoStart(val == "true");
+            } else if (key == "loop") {
+                // loop not directly supported in KParts::ReadOnlyPart
+            } else if (key == "volume") {
+                double v = val.toDouble() / 100.0;
+                setVolumeFactor(v);
+            }
+        }
     }
-}
-
-KMidPart::KMidPart( QObject *parent )
-    : KMediaPlayer::Player(parent),
-      d(new KMidPartPrivate(this, 0))
-{
-    kDebug() << "KMediaPlayer/Engine constructor"
-             << "parent:" << parent;
-    setComponentData( KMidPartFactory::componentData() );
-    QDBusConnection::sessionBus().registerObject(QLatin1String("/KMidPart"), this);
-    setupActions();
-    setXMLFile("kmid_part.rc");
-    setWidget(0);
-    initialize();
 }
 
 KMidPart::~KMidPart()
 {
     stop();
-    if (d->m_midiout != 0) {
+    if (d->m_midiout != nullptr) {
         d->m_midiout->allNotesOff();
         d->m_midiout->resetControllers();
     }
@@ -164,33 +132,28 @@ KMidPart::~KMidPart()
 
 void KMidPart::setupActions()
 {
-    d->m_play = new KAction(this);
-    d->m_play->setText(i18nc("@action player play", "Play") );
-    d->m_play->setIcon(KIcon("media-playback-start"));
-    d->m_play->setShortcut( Qt::Key_MediaPlay );
-    d->m_play->setWhatsThis(i18nc("@info:whatsthis","Start playback of the current session"));
+    d->m_play = new QAction(this);
+    d->m_play->setText(i18nc("@action player play", "Play"));
+    d->m_play->setIcon(QIcon::fromTheme("media-playback-start"));
     d->m_play->setEnabled(false);
     connect(d->m_play, SIGNAL(triggered()), SLOT(play()));
     actionCollection()->addAction("play", d->m_play);
 
     d->m_pause = new KToggleAction(this);
-    d->m_pause->setText(i18nc("@action player pause", "Pause") );
-    d->m_pause->setIcon(KIcon("media-playback-pause"));
-    d->m_pause->setWhatsThis(i18nc("@info:whatsthis","Pause the playback"));
+    d->m_pause->setText(i18nc("@action player pause", "Pause"));
+    d->m_pause->setIcon(QIcon::fromTheme("media-playback-pause"));
     d->m_pause->setEnabled(false);
     connect(d->m_pause, SIGNAL(triggered()), SLOT(pause()));
     actionCollection()->addAction("pause", d->m_pause);
 
-    d->m_stop = new KAction(this);
-    d->m_stop->setText(i18nc("@action player stop", "Stop") );
-    d->m_stop->setIcon(KIcon("media-playback-stop"));
-    d->m_stop->setShortcut( Qt::Key_MediaStop );
-    d->m_stop->setWhatsThis(i18nc("@info:whatsthis","Stop playback or recording") );
+    d->m_stop = new QAction(this);
+    d->m_stop->setText(i18nc("@action player stop", "Stop"));
+    d->m_stop->setIcon(QIcon::fromTheme("media-playback-stop"));
     d->m_stop->setEnabled(false);
     connect(d->m_stop, SIGNAL(triggered()), SLOT(stop()));
     actionCollection()->addAction("stop", d->m_stop);
 
-    if (d->m_view != 0) {
+    if (d->m_view != nullptr) {
         connect(d->m_view, SIGNAL(play()), SLOT(play()));
         connect(d->m_view, SIGNAL(pause()), SLOT(pause()));
         connect(d->m_view, SIGNAL(stop()), SLOT(stop()));
@@ -207,7 +170,7 @@ void KMidPart::initialize()
     connect(d->m_loader, SIGNAL(loaded(Backend*,const QString&,const QString&)),
                       SLOT(slotLoaded(Backend*,const QString&,const QString&)));
     d->m_loader->loadAllBackends();
-    if (d->m_currentBackend == 0) {
+    if (d->m_currentBackend == nullptr) {
         KMessageBox::error(d->m_parentWidget, i18nc("@info","No MIDI backend loaded."),
                 i18nc("@title:window","Fatal"));
     } else {
@@ -216,52 +179,49 @@ void KMidPart::initialize()
             d->m_mapper->clear();
         else {
             d->m_mapper->loadFile(mapperFile);
-            if (d->m_midiout != NULL) d->m_midiout->setMidiMap(d->m_mapper);
+            if (d->m_midiout != nullptr) d->m_midiout->setMidiMap(d->m_mapper);
         }
         switch(d->m_settings->reset_mode()) {
-        case KMid::Settings::None:
+        case Settings::None:
             d->m_resetMessage.clear();
             break;
-        case KMid::Settings::GM:
-            d->m_resetMessage = QByteArray::fromRawData (
-                    reinterpret_cast<const char *>(gmreset), sizeof(gmreset) );
+        case Settings::GM:
+            d->m_resetMessage = QByteArray::fromRawData(
+                    reinterpret_cast<const char *>(gmreset), sizeof(gmreset));
             break;
-        case KMid::Settings::GS:
-            d->m_resetMessage = QByteArray::fromRawData (
-                    reinterpret_cast<const char *>(gsreset), sizeof(gsreset) );
+        case Settings::GS:
+            d->m_resetMessage = QByteArray::fromRawData(
+                    reinterpret_cast<const char *>(gsreset), sizeof(gsreset));
             break;
-        case KMid::Settings::XG:
-            d->m_resetMessage = QByteArray::fromRawData (
-                    reinterpret_cast<const char *>(xgreset), sizeof(xgreset) );
+        case Settings::XG:
+            d->m_resetMessage = QByteArray::fromRawData(
+                    reinterpret_cast<const char *>(xgreset), sizeof(xgreset));
             break;
-        case KMid::Settings::Syx:
+        case Settings::Syx: {
             QFile file(d->m_settings->sysex_file().toLocalFile());
             file.open(QIODevice::ReadOnly);
             d->m_resetMessage = file.readAll();
             file.close();
             break;
         }
+        }
         d->m_midiout->setResetMessage(d->m_resetMessage);
         if (d->m_currentBackend->hasSoftSynths()) {
-            connect( d->m_currentBackend,
+            connect(d->m_currentBackend,
                 SIGNAL(softSynthStarted(const QString&,const QStringList&)),
-                SLOT(slotSoftSynthStarted(const QString&,const QStringList&)) );
-            connect( d->m_currentBackend,
+                SLOT(slotSoftSynthStarted(const QString&,const QStringList&)));
+            connect(d->m_currentBackend,
                 SIGNAL(softSynthErrors(const QString&,const QStringList&)),
-                SLOT(slotSoftSynthErrors(const QString&,const QStringList&)) );
+                SLOT(slotSoftSynthErrors(const QString&,const QStringList&)));
         }
-        if ( d->m_midiout != 0) {
-            if (d->m_settings->exec_fluid() || d->m_settings->exec_timidity())
-                kDebug() << "waiting for a soft synth";
-            else
+        if (d->m_midiout != nullptr) {
+            if (!d->m_settings->exec_fluid() && !d->m_settings->exec_timidity())
                 connectMidiOutput();
         }
-        slotUpdateState(Empty,Empty);
     }
 }
 
-void KMidPart::slotLoaded( Backend *backend,
-        const QString& library, const QString& name)
+void KMidPart::slotLoaded(Backend *backend, const QString& library, const QString& name)
 {
     MidiBackend midiBackend;
     midiBackend.backend = backend;
@@ -269,45 +229,29 @@ void KMidPart::slotLoaded( Backend *backend,
     midiBackend.name = name;
     d->m_backends.append(midiBackend);
     backend->setParent(this);
-    kDebug() << library << name << backend->initialized();
-    if ( backend != NULL && backend->initialized() &&
-         d->m_currentBackend == NULL &&
-         (d->m_settings->midi_backend().isEmpty() ||
-          d->m_settings->midi_backend() == library) ) {
+    if (backend != nullptr && backend->initialized() &&
+        d->m_currentBackend == nullptr &&
+        (d->m_settings->midi_backend().isEmpty() ||
+         d->m_settings->midi_backend() == library)) {
         d->m_midiobj = backend->midiObject();
         d->m_midiout = backend->midiOutput();
         d->m_midiout->setMidiMap(d->m_mapper);
 
-        connect(d->m_midiobj, SIGNAL(stateChanged(State,State)),
-                SLOT(slotUpdateState(State,State)));
-        connect(d->m_midiobj, SIGNAL(tick(qint64)),
-                SLOT(slotTick(qint64)));
-        connect(d->m_midiobj, SIGNAL(finished()),
-                SLOT(slotFinished()));
-        connect(d->m_midiobj, SIGNAL(currentSourceChanged(QString)),
-                SLOT(slotSourceChanged(QString)));
-        connect(d->m_midiobj, SIGNAL(tempoChanged(qreal)),
-                SLOT(slotTempoChanged(qreal)));
-        connect(d->m_midiobj, SIGNAL(beat(int,int,int)),
-                SIGNAL(beat(int,int,int)));
-        connect(d->m_midiobj, SIGNAL(timeSignatureChanged(int,int)),
-                SIGNAL(timeSignatureEvent(int,int)));
-        connect(d->m_midiobj, SIGNAL(midiText(int,const QString&)),
-                SIGNAL(midiTextEvent(int,const QString&)));
-        connect(d->m_midiobj, SIGNAL(midiNoteOn(int,int,int)),
-                SIGNAL(midiNoteOnEvent(int,int,int)));
-        connect(d->m_midiobj, SIGNAL(midiNoteOff(int,int,int)),
-                SIGNAL(midiNoteOffEvent(int,int,int)));
-        connect(d->m_midiobj, SIGNAL(midiController(int,int,int)),
-                SIGNAL(midiControllerEvent(int,int,int)));
-        connect(d->m_midiobj, SIGNAL(midiKeyPressure(int,int,int)),
-                SIGNAL(midiKeyPressureEvent(int,int,int)));
-        connect(d->m_midiobj, SIGNAL(midiProgram(int,int)),
-                SIGNAL(midiProgramEvent(int,int)));
-        connect(d->m_midiobj, SIGNAL(midiChannelPressure(int,int)),
-                SIGNAL(midiChannelPressureEvent(int,int)));
-        connect(d->m_midiobj, SIGNAL(midiPitchBend(int,int)),
-                SIGNAL(midiPitchBendEvent(int,int)));
+        connect(d->m_midiobj, SIGNAL(stateChanged(State,State)), SLOT(slotUpdateState(State,State)));
+        connect(d->m_midiobj, SIGNAL(tick(qint64)), SLOT(slotTick(qint64)));
+        connect(d->m_midiobj, SIGNAL(finished()), SLOT(slotFinished()));
+        connect(d->m_midiobj, SIGNAL(currentSourceChanged(QString)), SLOT(slotSourceChanged(QString)));
+        connect(d->m_midiobj, SIGNAL(tempoChanged(qreal)), SLOT(slotTempoChanged(qreal)));
+        connect(d->m_midiobj, SIGNAL(beat(int,int,int)), SIGNAL(beat(int,int,int)));
+        connect(d->m_midiobj, SIGNAL(timeSignatureChanged(int,int)), SIGNAL(timeSignatureEvent(int,int)));
+        connect(d->m_midiobj, SIGNAL(midiText(int,const QString&)), SIGNAL(midiTextEvent(int,const QString&)));
+        connect(d->m_midiobj, SIGNAL(midiNoteOn(int,int,int)), SIGNAL(midiNoteOnEvent(int,int,int)));
+        connect(d->m_midiobj, SIGNAL(midiNoteOff(int,int,int)), SIGNAL(midiNoteOffEvent(int,int,int)));
+        connect(d->m_midiobj, SIGNAL(midiController(int,int,int)), SIGNAL(midiControllerEvent(int,int,int)));
+        connect(d->m_midiobj, SIGNAL(midiKeyPressure(int,int,int)), SIGNAL(midiKeyPressureEvent(int,int,int)));
+        connect(d->m_midiobj, SIGNAL(midiProgram(int,int)), SIGNAL(midiProgramEvent(int,int)));
+        connect(d->m_midiobj, SIGNAL(midiChannelPressure(int,int)), SIGNAL(midiChannelPressureEvent(int,int)));
+        connect(d->m_midiobj, SIGNAL(midiPitchBend(int,int)), SIGNAL(midiPitchBendEvent(int,int)));
 
         if (backend->hasSoftSynths())
             backend->initializeSoftSynths(d->m_settings);
@@ -320,16 +264,11 @@ void KMidPart::slotSoftSynthStarted(const QString& pgm, const QStringList& messa
 {
     if (!messages.isEmpty())
         KMessageBox::informationList(d->m_parentWidget,
-            i18ncp("@info", "%2 has returned the following message "
-                    "when launched with the provided arguments.",
-                    "%2 has returned the following messages "
-                    "when launched with the provided arguments.",
-                    messages.size(),
-                    pgm),
+            i18ncp("@info", "%2 has returned the following message when launched.",
+                    "%2 has returned the following messages when launched.",
+                    messages.size(), pgm),
             messages,
-            i18ncp("@title:window", "%2 message", "%2 messages",
-                    messages.size(),
-                    pgm),
+            i18ncp("@title:window", "%2 message", "%2 messages", messages.size(), pgm),
             "softsynth_warnings");
     connectMidiOutput();
 }
@@ -337,12 +276,9 @@ void KMidPart::slotSoftSynthStarted(const QString& pgm, const QStringList& messa
 void KMidPart::slotSoftSynthErrors(const QString& pgm, const QStringList& messages)
 {
     KMessageBox::error(d->m_parentWidget,
-        i18ncp("@info", "Failed to run %2 with the provided "
-                "arguments.<nl/>Returned message:<nl/>%3",
-                "Failed to run %2 with the provided "
-                "arguments.<nl/>Returned messages:<nl/>%3",
-                messages.size(),
-                pgm, messages.join("<nl/>")),
+        i18ncp("@info", "Failed to run %2. Returned message: %3",
+                "Failed to run %2. Returned messages: %3",
+                messages.size(), pgm, messages.join("\n")),
         i18nc("@title:window", "%1 startup failed", pgm));
 }
 
@@ -353,14 +289,15 @@ void KMidPart::connectMidiOutput()
     QString conn = d->m_settings->output_connection();
     if (conn.isEmpty()) {
         QStringList items = d->m_midiout->outputDeviceList();
-        conn = items.first();
-        success = d->m_midiout->setOutputDeviceName(conn);
-        if (success)
-            d->m_settings->setOutput_connection(conn);
+        if (!items.isEmpty()) {
+            conn = items.first();
+            success = d->m_midiout->setOutputDeviceName(conn);
+            if (success)
+                d->m_settings->setOutput_connection(conn);
+        }
     } else {
         success = d->m_midiout->setOutputDeviceName(conn);
     }
-    kDebug() << "connection to" << conn << "result:" << success;
     d->m_playerReady = success;
     if (success && d->m_playPending) {
         locker.unlock();
@@ -368,45 +305,33 @@ void KMidPart::connectMidiOutput()
     }
 }
 
-void KMidPart::slotUpdateState(State newState, State /*oldState*/)
+void KMidPart::slotUpdateState(KMid::State newState, KMid::State /*oldState*/)
 {
-    KMid::State kmidstate = static_cast<KMid::State>(newState);
-    switch(kmidstate) {
+    switch(newState) {
     case KMid::PlayingState:
-        //kDebug() << "State: play";
-        setState(Play);
-        //stateChanged("playing_state");
         d->m_play->setEnabled(false);
         d->m_pause->setEnabled(true);
         d->m_pause->setChecked(false);
         d->m_stop->setEnabled(true);
-        if (d->m_view != 0)
+        if (d->m_view != nullptr)
             d->m_view->setPlayingState(true);
         break;
     case KMid::PausedState:
-        //kDebug() << "State: pause";
-        setState(Pause);
         break;
     case KMid::StoppedState:
-        //kDebug() << "State: stop";
-        setState(Stop);
-        //stateChanged("stopped_state");
         d->m_play->setEnabled(true);
         d->m_pause->setEnabled(false);
         d->m_pause->setChecked(false);
         d->m_stop->setEnabled(false);
-        if (d->m_view != 0)
+        if (d->m_view != nullptr)
             d->m_view->setPlayingState(false);
         break;
     default:
-        //kDebug() << "State: empty";
-        setState(Empty);
-        //stateChanged("disabled_state");
         d->m_play->setEnabled(false);
         d->m_pause->setEnabled(false);
         d->m_pause->setChecked(false);
         d->m_stop->setEnabled(false);
-        if (d->m_view != 0)
+        if (d->m_view != nullptr)
             d->m_view->setPlayingState(false);
         break;
     }
@@ -414,88 +339,70 @@ void KMidPart::slotUpdateState(State newState, State /*oldState*/)
 
 void KMidPart::slotTick(qint64 ticks)
 {
-    if (d->m_view != 0)
+    if (d->m_view != nullptr)
         d->m_view->setPosition(ticks);
     emit tick(ticks);
 }
 
 void KMidPart::slotFinished()
 {
-    if (d->m_view != 0)
+    if (d->m_view != nullptr)
         d->m_view->setPosition(0);
-    if (isLooping())
-        play();
     emit finished();
 }
 
 KAboutData *KMidPart::createAboutData()
 {
-    KAboutData *aboutData = new KAboutData( "kmid_part", 0,
-            ki18nc("@title", "KMidPart"), "0.1");
-    aboutData->addAuthor( ki18nc("@info:credit", "Pedro Lopez-Cabanillas"),
-            ki18nc("@info:credit", "Maintainer"), "plcl@users.sf.net");
+    KAboutData *aboutData = new KAboutData(
+        QStringLiteral("kmid_part"), i18nc("@title", "KMidPart"), QStringLiteral("0.1"));
+    aboutData->addAuthor(i18nc("@info:credit", "Pedro Lopez-Cabanillas"),
+            i18nc("@info:credit", "Maintainer"), QStringLiteral("plcl@users.sf.net"));
     return aboutData;
 }
 
 bool KMidPart::openFile()
 {
     QString localFile = localFilePath();
-    if (d->m_midiobj != 0) {
+    if (d->m_midiobj != nullptr) {
         d->m_midiobj->setCurrentSource(localFile);
         d->m_midiobj->seek(0);
-        if (d->m_view != 0)
+        if (d->m_view != nullptr)
             d->m_view->resetTimePosition(d->m_midiobj->totalTime());
     }
     return true;
 }
 
-KMediaPlayer::View* KMidPart::view ()
-{
-    return d->m_view;
-}
-
-bool KMidPart::isSeekable() const
-{
-    return true;
-}
+bool KMidPart::isSeekable() const { return true; }
 
 qlonglong KMidPart::position() const
 {
-    if (d->m_midiobj != 0)
-        return d->m_midiobj->currentTime();
+    if (d->m_midiobj != nullptr) return d->m_midiobj->currentTime();
     return 0;
 }
 
-bool KMidPart::hasLength() const
-{
-    return true;
-}
+bool KMidPart::hasLength() const { return true; }
 
 qlonglong KMidPart::length() const
 {
-    if (d->m_midiobj != 0)
-        return d->m_midiobj->totalTime();
+    if (d->m_midiobj != nullptr) return d->m_midiobj->totalTime();
     return 0;
 }
 
 void KMidPart::seek(qlonglong value)
 {
-    if (d->m_midiobj != 0) {
+    if (d->m_midiobj != nullptr) {
         d->m_midiobj->seek(value);
-        if ((state() != Play) && (d->m_view != 0))
+        if (d->m_view != nullptr)
             d->m_view->setPosition(value);
     }
 }
 
-void KMidPart::slotSeek(int value)
-{
-    seek(value);
-}
+void KMidPart::slotSeek(int value) { seek(value); }
 
 void KMidPart::pause()
 {
-    if (d->m_midiobj != 0) {
-        if (state() == Pause)
+    if (d->m_midiobj != nullptr) {
+        if (d->m_midiobj->state() == KMid::PausedState)
             d->m_midiobj->play();
         else
             d->m_midiobj->pause();
@@ -505,7 +412,7 @@ void KMidPart::pause()
 void KMidPart::play()
 {
     QMutexLocker locker(&d->m_connmutex);
-    if (d->m_midiobj != NULL) {
+    if (d->m_midiobj != nullptr) {
         d->m_midiobj->play();
         d->m_playPending = false;
     }
@@ -513,14 +420,14 @@ void KMidPart::play()
 
 void KMidPart::stop()
 {
-    if (d->m_midiobj != 0)
+    if (d->m_midiobj != nullptr)
         d->m_midiobj->stop();
 }
 
 void KMidPart::slotSourceChanged(QString src)
 {
     QMutexLocker locker(&d->m_connmutex);
-    if (d->m_view != 0)
+    if (d->m_view != nullptr)
         d->m_view->setPosition(0);
     if (d->m_autoStart) {
         if (d->m_playerReady) {
@@ -532,26 +439,18 @@ void KMidPart::slotSourceChanged(QString src)
     emit sourceChanged(src);
 }
 
-bool KMidPart::autoStart()
-{
-    return d->m_autoStart;
-}
+bool KMidPart::autoStart() { return d->m_autoStart; }
+void KMidPart::setAutoStart(bool start) { d->m_autoStart = start; }
 
 QString KMidPart::midiConnection()
 {
-    if (d->m_midiout != 0)
-        return d->m_midiout->outputDeviceName();
+    if (d->m_midiout != nullptr) return d->m_midiout->outputDeviceName();
     return QString();
-}
-
-void KMidPart::setAutoStart(bool start)
-{
-    d->m_autoStart = start;
 }
 
 void KMidPart::setMidiConnection(const QString conn)
 {
-    if (d->m_midiout != 0) {
+    if (d->m_midiout != nullptr) {
         if (d->m_midiout->setOutputDeviceName(conn))
             d->m_settings->setOutput_connection(conn);
     }
@@ -559,12 +458,11 @@ void KMidPart::setMidiConnection(const QString conn)
 
 void KMidPart::reload()
 {
-    if (d->m_midiobj != 0) {
-        if (state() == Play)
-            stop();
+    if (d->m_midiobj != nullptr) {
         qlonglong curpos = position();
         QString cursrc = d->m_midiobj->currentSource();
         if (!cursrc.isEmpty()) {
+            stop();
             d->m_midiobj->clear();
             d->m_midiobj->setCurrentSource(cursrc);
             seek(curpos);
@@ -574,77 +472,64 @@ void KMidPart::reload()
 
 QStringList KMidPart::metaData(const QString& key)
 {
-    if (d->m_midiobj != 0)
-        return d->m_midiobj->metaData(key);
+    if (d->m_midiobj != nullptr) return d->m_midiobj->metaData(key);
     return QStringList();
 }
 
 void KMidPart::setTempoFactor(double f)
 {
-    if (d->m_midiobj != 0)
-        d->m_midiobj->setTimeSkew(f);
+    if (d->m_midiobj != nullptr) d->m_midiobj->setTimeSkew(f);
 }
 
 void KMidPart::setVolumeFactor(double f)
 {
     d->m_volfactor = f;
-    if (d->m_midiout != 0)
-        d->m_midiout->setVolume(-1, f);
+    if (d->m_midiout != nullptr) d->m_midiout->setVolume(-1, f);
 }
 
 void KMidPart::setTranspose(int t)
 {
-    if (d->m_midiout != 0)
-        d->m_midiout->setPitchShift(t);
+    if (d->m_midiout != nullptr) d->m_midiout->setPitchShift(t);
 }
 
 double KMidPart::tempoFactor()
 {
-    if (d->m_midiobj != 0)
-        return d->m_midiobj->timeSkew();
+    if (d->m_midiobj != nullptr) return d->m_midiobj->timeSkew();
     return 1.0;
 }
 
-double KMidPart::volumeFactor()
-{
-    return d->m_volfactor;
-}
+double KMidPart::volumeFactor() { return d->m_volfactor; }
 
 int KMidPart::transpose()
 {
-    if (d->m_midiout != 0)
-        return d->m_midiout->pitchShift();
+    if (d->m_midiout != nullptr) return d->m_midiout->pitchShift();
     return 0;
 }
 
 void KMidPart::setMuted(int channel, bool muted)
 {
-    if (d->m_midiout != 0)
-        d->m_midiout->setMuted(channel, muted);
+    if (d->m_midiout != nullptr) d->m_midiout->setMuted(channel, muted);
 }
 
 bool KMidPart::isMuted(int channel)
 {
-    if (d->m_midiout != 0)
-        return d->m_midiout->isMuted(channel);
+    if (d->m_midiout != nullptr) return d->m_midiout->isMuted(channel);
     return false;
 }
 
-bool KMidPart::openUrl(const KUrl& url)
+bool KMidPart::openUrl(const QUrl& url)
 {
     return KParts::ReadOnlyPart::openUrl(url);
 }
 
 bool KMidPart::openUrl(const QString& str)
 {
-    KUrl url(str);
-    return KParts::ReadOnlyPart::openUrl(url);
+    return KParts::ReadOnlyPart::openUrl(QUrl(str));
 }
 
 QString KMidPart::currentSource() const
 {
-    if (d->m_midiobj != 0)
-        return d->m_midiobj->currentSource();
+    if (d->m_midiobj != nullptr) return d->m_midiobj->currentSource();
     return QString();
 }
 
@@ -655,14 +540,14 @@ void KMidPart::slotTempoChanged(qreal tempo)
 
 QDBusVariant KMidPart::songProperty(const QString& key)
 {
-    if (d->m_midiobj != 0)
-        return QDBusVariant(d->m_midiobj->songProperty(key));
+    if (d->m_midiobj != nullptr) return QDBusVariant(d->m_midiobj->songProperty(key));
     return QDBusVariant();
 }
 
 QDBusVariant KMidPart::channelProperty(int channel, const QString& key)
 {
-    if (d->m_midiobj != 0)
-        return QDBusVariant(d->m_midiobj->channelProperty(channel, key));
+    if (d->m_midiobj != nullptr) return QDBusVariant(d->m_midiobj->channelProperty(channel, key));
     return QDBusVariant();
 }
+
+#include "kmid_part.moc"

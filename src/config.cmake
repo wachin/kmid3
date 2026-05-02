@@ -20,7 +20,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#cmakedefine VERSION "@VERSION@"
+#define VERSION "@PROJECT_VERSION@"
 #cmakedefine WITH_ALSA @WITH_ALSA@
 #cmakedefine WITH_COREMIDI @WITH_COREMIDI@
 #cmakedefine WITH_COREAUDIO @WITH_COREAUDIO@

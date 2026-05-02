@@ -18,7 +18,7 @@
 */
 
 #include "instrumentset.h"
-#include <klocale.h>
+#include <KLocalizedString>
 
 InstrumentSet::InstrumentSet()
 {

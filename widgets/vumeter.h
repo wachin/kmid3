@@ -20,7 +20,7 @@
 #ifndef VUMETER_H
 #define VUMETER_H
 
-#include <QtGui/QWidget>
+#include <QWidget>
 
 class QImage;
 

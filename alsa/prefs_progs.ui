@@ -12,7 +12,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="KTabWidget" name="tabs">
+    <widget class="QTabWidget" name="tabs">
      <property name="currentIndex">
       <number>0</number>
      </property>
@@ -351,28 +351,22 @@
   <customwidget>
    <class>KComboBox</class>
    <extends>QComboBox</extends>
-   <header>kcombobox.h</header>
+   <header>KComboBox</header>
   </customwidget>
   <customwidget>
    <class>KLineEdit</class>
    <extends>QLineEdit</extends>
-   <header>klineedit.h</header>
-  </customwidget>
-  <customwidget>
-   <class>KTabWidget</class>
-   <extends>QTabWidget</extends>
-   <header>ktabwidget.h</header>
-   <container>1</container>
+   <header>KLineEdit</header>
   </customwidget>
   <customwidget>
    <class>KTitleWidget</class>
    <extends>QWidget</extends>
-   <header>ktitlewidget.h</header>
+   <header>KTitleWidget</header>
   </customwidget>
   <customwidget>
    <class>KUrlRequester</class>
    <extends>QFrame</extends>
-   <header>kurlrequester.h</header>
+   <header>KUrlRequester</header>
   </customwidget>
  </customwidgets>
  <resources/>

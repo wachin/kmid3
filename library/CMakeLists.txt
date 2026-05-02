@@ -1,7 +1,7 @@
 set(kmidbackend_VERSION "1.0.0")
 set(kmidbackend_SOVERSION "1")
 
-set ( library_HEADERS
+set(library_HEADERS
     backendloader.h
     backend.h
     kmidmacros.h
@@ -10,7 +10,7 @@ set ( library_HEADERS
     midimapper.h
 )
 
-set ( library_SOURCES
+set(library_SOURCES
     backendloader.cpp
     backend.cpp
     midiobject.cpp
@@ -18,32 +18,31 @@ set ( library_SOURCES
     midimapper.cpp
 )
 
-kde4_add_kcfg_files( library_SOURCES settings.kcfgc )
+kconfig_add_kcfg_files(library_SOURCES settings.kcfgc)
 
-kde4_add_library ( kmidbackend SHARED ${library_SOURCES} ${library_HEADERS} )
+add_library(kmidbackend SHARED ${library_SOURCES} ${library_HEADERS})
+target_compile_definitions(kmidbackend PRIVATE MAKE_KMIDBACKEND_LIB)
 
-target_link_libraries( kmidbackend ${KDE4_KDECORE_LIBRARY} ${KDE4_KDEUI_LIBS} )
+target_link_libraries(kmidbackend
+    KF5::CoreAddons
+    KF5::ConfigCore
+    KF5::ConfigGui
+    Qt5::Core
+    Qt5::Gui
+    Qt5::Widgets
+)
 
-set_target_properties( kmidbackend PROPERTIES
+set_target_properties(kmidbackend PROPERTIES
     VERSION ${kmidbackend_VERSION}
     SOVERSION ${kmidbackend_SOVERSION}
 )
 
-install( TARGETS kmidbackend ${INSTALL_TARGETS_DEFAULT_ARGS} )
-install( FILES ${library_HEADERS} 
-    DESTINATION ${INCLUDE_INSTALL_DIR}/kmid )
-install( FILES ${CMAKE_CURRENT_BINARY_DIR}/settings.h 
-    DESTINATION ${INCLUDE_INSTALL_DIR}/kmid )
-install( FILES kmid_backend.desktop 
-    DESTINATION ${SERVICETYPES_INSTALL_DIR} )
-install( FILES kmid.kcfg 
-    DESTINATION ${KCFG_INSTALL_DIR} )
-
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.cmake 
-        ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
-    add_custom_target( apidox
-        COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile 
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} )
-endif(DOXYGEN_FOUND)
+install(TARGETS kmidbackend ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+install(FILES ${library_HEADERS}
+    DESTINATION ${KDE_INSTALL_INCLUDEDIR}/kmid)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/settings.h
+    DESTINATION ${KDE_INSTALL_INCLUDEDIR}/kmid)
+install(FILES kmid_backend.desktop
+    DESTINATION ${KDE_INSTALL_KSERVICETYPES5DIR})
+install(FILES kmid.kcfg
+    DESTINATION ${KDE_INSTALL_KCFGDIR})

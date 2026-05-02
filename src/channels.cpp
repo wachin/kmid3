@@ -27,10 +27,10 @@
 #include <QPixmap>
 #include <QIcon>
 #include <QTimerEvent>
-#include <KIcon>
-#include <KLocale>
-#include <KComboBox>
-#include <KLineEdit>
+#include <QComboBox>
+#include <QLineEdit>
+#include <KLocalizedString>
+#include <KMainWindow>
 
 Channels::Channels( QWidget* parent ) :
     KMainWindow(parent),
@@ -39,7 +39,7 @@ Channels::Channels( QWidget* parent ) :
 {
     setObjectName("ChannelsWindow");
     setAttribute(Qt::WA_DeleteOnClose, false);
-    setCaption(i18nc("@title:window","MIDI Channels"));
+    setWindowTitle(i18nc("@title:window","MIDI Channels"));
     m_soloMapper = new QSignalMapper(this);
     m_muteMapper = new QSignalMapper(this);
     m_patchMapper = new QSignalMapper(this);
@@ -84,8 +84,8 @@ Channels::Channels( QWidget* parent ) :
     QIcon soloIcon;
     soloIcon.addPixmap(pixSoloOn, QIcon::Normal, QIcon::On);
     soloIcon.addPixmap(pixSoloOff,QIcon::Normal, QIcon::Off);
-    KIcon locked("object-locked");
-    KIcon unlocked("object-unlocked");
+    QIcon locked = QIcon::fromTheme("object-locked");
+    QIcon unlocked = QIcon::fromTheme("object-unlocked");
     QIcon lockIcon;
     QSize lockSize(16,16);
     lockIcon.addPixmap(locked.pixmap(lockSize), QIcon::Normal, QIcon::On);
@@ -95,7 +95,7 @@ Channels::Channels( QWidget* parent ) :
         lbl = new QLabel(this);
         lbl->setNum(row);
         layout->addWidget(lbl, row, 0, Qt::AlignRight | Qt::AlignVCenter);
-        m_name[i] = new KLineEdit(this);
+        m_name[i] = new QLineEdit(this);
         layout->addWidget(m_name[i], row, 1);
         connect( m_name[i], SIGNAL(editingFinished()), m_nameMapper, SLOT(map()) );
         m_nameMapper->setMapping( m_name[i], i );
@@ -119,7 +119,7 @@ Channels::Channels( QWidget* parent ) :
         layout->addWidget(m_lock[i], row, 5);
         connect( m_lock[i], SIGNAL(clicked()), m_lockMapper, SLOT(map()) );
         m_lockMapper->setMapping( m_lock[i], i);
-        m_patch[i] = new KComboBox(this);
+        m_patch[i] = new QComboBox(this);
         m_patch[i]->addItems(m_instSet.names(i == MIDI_GM_DRUM_CHANNEL));
         layout->addWidget(m_patch[i], row, 6);
         connect( m_patch[i], SIGNAL(activated(int)), m_patchMapper, SLOT(map()) );
@@ -327,5 +327,6 @@ void Channels::slotNameChannel(int channel)
 {
     emit name(channel, m_name[channel]->text());
 }
+
 
 #include "channels.moc"

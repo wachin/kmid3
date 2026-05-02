@@ -32,7 +32,7 @@
     </widget>
    </item>
    <item row="4" column="0" colspan="2">
-    <widget class="KListWidget" name="connList"/>
+    <widget class="QListWidget" name="connList"/>
    </item>
    <item row="5" column="0" colspan="2">
     <widget class="QCheckBox" name="kcfg_advanced_ports">
@@ -109,42 +109,21 @@
   <customwidget>
    <class>KComboBox</class>
    <extends>QComboBox</extends>
-   <header>kcombobox.h</header>
+   <header>KComboBox</header>
   </customwidget>
   <customwidget>
    <class>KLineEdit</class>
    <extends>QLineEdit</extends>
-   <header>klineedit.h</header>
-  </customwidget>
-  <customwidget>
-   <class>KListWidget</class>
-   <extends>QListWidget</extends>
-   <header>klistwidget.h</header>
+   <header>KLineEdit</header>
   </customwidget>
   <customwidget>
    <class>KUrlRequester</class>
    <extends>QFrame</extends>
-   <header>kurlrequester.h</header>
+   <header>KUrlRequester</header>
   </customwidget>
  </customwidgets>
  <resources/>
  <connections>
-  <connection>
-   <sender>connList</sender>
-   <signal>currentTextChanged(QString)</signal>
-   <receiver>kcfg_output_connection</receiver>
-   <slot>setText(QString)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>104</x>
-     <y>181</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>121</x>
-     <y>324</y>
-    </hint>
-   </hints>
-  </connection>
   <connection>
    <sender>mapsCombo</sender>
    <signal>activated(QString)</signal>

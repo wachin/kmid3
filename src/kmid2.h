@@ -26,38 +26,35 @@
 #include "ui_prefs_midi.h"
 
 #include <KXmlGuiWindow>
-#include <KProcess>
+#include <QProcess>
 #include <QDBusVariant>
+#include <QUrl>
+#include <QAction>
+#include <QPointer>
+#include <QSlider>
+#include <QLabel>
+#include <QPushButton>
+#include <QComboBox>
+#include <QTextEdit>
+#include <QDockWidget>
 
 class Pianola;
 class Channels;
 class RhythmView;
 class TimeLabel;
 class KToggleAction;
-class KAction;
-class KUrl;
-class KComboBox;
-class KTextEdit;
 class KRecentFilesAction;
+class Settings;
 
 namespace KMid {
-      class Backend;
-      class MIDIObject;
-      class MIDIOutput;
-      class BackendLoader;
-      class Settings;
+    class Backend;
+    class MIDIObject;
+    class MIDIOutput;
+    class BackendLoader;
 }
 
 using namespace KMid;
 
-/**
- * This class serves as the main window for KMid2.  It handles the
- * menus, toolbars, and status bars.
- *
- * @short Main window class
- * @author Pedro Lopez-Cabanillas <plcl@users.sf.net>
- * @version 0.1
- */
 class KMid2 : public KXmlGuiWindow
 {
     Q_OBJECT
@@ -72,21 +69,14 @@ class KMid2 : public KXmlGuiWindow
     Q_PROPERTY(int state READ state)
 
 public:
-    /**
-     * Default Constructor
-     */
     KMid2();
-
-    /**
-     * Default Destructor
-     */
     virtual ~KMid2();
 
-    void setPlayList(const KUrl::List &urls);
-    void setUrlsLater(const KUrl::List &urls);
-    void dragEnterEvent(QDragEnterEvent* event);
-    void dropEvent(QDropEvent* event);
-    void showEvent(QShowEvent* event);
+    void setPlayList(const QList<QUrl> &urls);
+    void setUrlsLater(const QList<QUrl> &urls);
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+    void showEvent(QShowEvent* event) override;
     void reload();
     bool isMuted(int channel);
     QStringList metaData(const QString& key);
@@ -158,7 +148,7 @@ private slots:
     void slotPianolaClosed();
     void slotChannelsClosed();
     void slotShuffle(bool checked);
-    void slotURLSelected(const KUrl& url);
+    void slotURLSelected(const QUrl& url);
     void slotUpdateConfigDialogWidgets();
     void slotCheckOutput();
     void slotSaveSongSettings();
@@ -166,7 +156,7 @@ private slots:
     void slotSoftSynthStarted(const QString& pgm, const QStringList& messages);
     void slotSoftSynthErrors(const QString& pgm, const QStringList& messages);
     void slotBackendChanged(int index);
-    void slotDockVolLocationChanged ( Qt::DockWidgetArea area );
+    void slotDockVolLocationChanged(Qt::DockWidgetArea area);
     void slotTempoChanged(qreal);
 
 signals:
@@ -194,12 +184,12 @@ private:
     void initialize();
     void displayLyrics();
     void updateTempoLabel();
-    bool queryExit();
+    bool queryClose() override;
     void displayBeat(const int bars, const int beats);
     void connectMidiOutput();
     void loadPlaylist(const QString &fileName);
-    void readProperties(const KConfigGroup &cfg);
-    void saveProperties(KConfigGroup &cfg);
+    void readProperties(const KConfigGroup &cfg) override;
+    void saveProperties(KConfigGroup &cfg) override;
     QString chooseInitialConnection(const QStringList& items);
 
 private:
@@ -221,22 +211,22 @@ private:
     KToggleAction *m_showPianola;
     KToggleAction *m_showChannels;
     KToggleAction *m_shuffle;
-
-    KAction *m_play;
-    KAction *m_forward;
-    KAction *m_rewind;
-    KAction *m_stop;
-    KAction *m_previous;
-    KAction *m_next;
-    KAction *m_fileInfo;
-    KAction *m_fileSaveLyrics;
-    KAction *m_playListSave;
-    KAction *m_playListLoad;
-    KAction *m_playListEdit;
-    KAction *m_print;
-    KAction *m_saveSongSettings;
-    KAction *m_loadSongSettings;
     KToggleAction *m_autoSongSettings;
+
+    QAction *m_play;
+    QAction *m_forward;
+    QAction *m_rewind;
+    QAction *m_stop;
+    QAction *m_previous;
+    QAction *m_next;
+    QAction *m_fileInfo;
+    QAction *m_fileSaveLyrics;
+    QAction *m_playListSave;
+    QAction *m_playListLoad;
+    QAction *m_playListEdit;
+    QAction *m_print;
+    QAction *m_saveSongSettings;
+    QAction *m_loadSongSettings;
     KRecentFilesAction *m_recentFiles;
 
     QPointer<Pianola> m_pianola;
@@ -259,9 +249,9 @@ private:
     TimeLabel *m_timeLabel;
     QPushButton *m_btnResetTempo;
     RhythmView *m_rhythm;
-    KComboBox *m_comboCodecs;
-    KTextEdit *m_lyricsText;
-    KUrl::List m_pendingList;
+    QComboBox *m_comboCodecs;
+    QTextEdit *m_lyricsText;
+    QList<QUrl> m_pendingList;
 
     struct MidiBackend {
         QString  library;

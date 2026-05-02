@@ -1,20 +1,11 @@
 /*
-    KMid2 MIDI/Karaoke Player
+    KMid2 MIDI/Karaoke Player - Updated for KDE5/Qt5
     Copyright (C) 2009-2010 Pedro Lopez-Cabanillas <plcl@users.sf.net>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #include "kmid2.h"
@@ -28,13 +19,11 @@
 #include "playlistdialog.h"
 #include "kmidadaptor.h"
 
-#include "kmid2.moc"
-
 #include <algorithm>
-#include <QtGui/QDropEvent>
-#include <QtGui/QPainter>
-#include <QtGui/QPrinter>
-#include <QtGui/QPrintDialog>
+#include <QDropEvent>
+#include <QPainter>
+#include <QPrinter>
+#include <QPrintDialog>
 #include <QTextDocument>
 #include <QToolTip>
 #include <QTextCursor>
@@ -42,28 +31,34 @@
 #include <QDockWidget>
 #include <QTimer>
 #include <QTextCodec>
-#include <KInputDialog>
+#include <QGridLayout>
+#include <QVBoxLayout>
+#include <QFrame>
+#include <QFileInfo>
+#include <QFile>
+#include <QTextStream>
+#include <QSaveFile>
+#include <QFileDialog>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QApplication>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QStandardPaths>
+#include <QDBusConnection>
+
 #include <KConfigDialog>
-#include <KStatusBar>
-#include <KAction>
 #include <KToggleAction>
 #include <KActionCollection>
 #include <KStandardAction>
-#include <KApplication>
-#include <KLocale>
-#include <KFileDialog>
-#include <KUrl>
+#include <KLocalizedString>
 #include <KMessageBox>
-#include <KCharsets>
-#include <KGlobalSettings>
-#include <KSaveFile>
-#include <KEditListBox>
-#include <KUrlRequester>
-#include <KStandardDirs>
-#include <KTextEdit>
 #include <KRecentFilesAction>
-#include <KFilePlacesModel>
-#include <KConfigSkeleton>
+#include <KConfig>
+#include <KConfigGroup>
+#include <KSharedConfig>
+#include <KIconLoader>
+#include <KCodecs>
 
 using namespace KMid;
 
@@ -72,10 +67,10 @@ KMid2::KMid2() : KXmlGuiWindow(),
       m_seeking(false),
       m_seekamt(0),
       m_rtempo(0.0),
-      m_loader(0),
-      m_currentBackend(0),
-      m_midiobj(0),
-      m_midiout(0),
+      m_loader(nullptr),
+      m_currentBackend(nullptr),
+      m_midiobj(nullptr),
+      m_midiout(nullptr),
       m_settings(new Settings)
 {
     (void) new KMidAdaptor(this);
@@ -83,7 +78,6 @@ KMid2::KMid2() : KXmlGuiWindow(),
     setAcceptDrops(true);
     setupDockWidgets();
     setupActions();
-    setupPlaces();
     setupGUI();
     initialize();
 }
@@ -101,9 +95,9 @@ void KMid2::slotLoaded(Backend *backend, const QString& library, const QString& 
     midiBackend.name = name;
     m_backends.append(midiBackend);
     backend->setParent(this);
-    kDebug() << library << name << backend->initialized();
-    if ( backend != 0 && backend->initialized() &&
-         m_currentBackend == 0 &&
+    qDebug() << library << name << backend->initialized();
+    if ( backend != nullptr && backend->initialized() &&
+         m_currentBackend == nullptr &&
          (m_settings->midi_backend().isEmpty() ||
           m_settings->midi_backend() == library) ) {
         m_midiobj = backend->midiObject();
@@ -124,7 +118,6 @@ void KMid2::slotLoaded(Backend *backend, const QString& library, const QString& 
         connect(m_midiobj, SIGNAL(tempoChanged(qreal)),
                 SLOT(slotTempoChanged(qreal)));
 
-        /* DBus signals from MIDIObject ones */
         connect( m_midiobj, SIGNAL(midiText(int,const QString&)),
                  SIGNAL(midiTextEvent(int,const QString&)) );
         connect( m_midiobj, SIGNAL(finished()), SIGNAL(playerFinished()) );
@@ -165,7 +158,7 @@ void KMid2::initialize()
     connect(m_loader, SIGNAL(loaded(Backend*,const QString&,const QString&)),
                       SLOT(slotLoaded(Backend*,const QString&,const QString&)));
     m_loader->loadAllBackends();
-    if (m_currentBackend == 0) {
+    if (m_currentBackend == nullptr) {
         KMessageBox::error(this, i18nc("@info","No MIDI backend loaded."),
                 i18nc("@title:window","Fatal"));
         close();
@@ -221,12 +214,11 @@ void KMid2::initialize()
     connect(m_channels, SIGNAL(lock(int,bool)),
             m_midiout, SLOT(setLocked(int,bool)),
             Qt::QueuedConnection);
-
     connect(m_channels, SIGNAL(name(int,const QString&)),
             m_pianola, SLOT(slotLabel(int,const QString&)),
             Qt::QueuedConnection);
 
-    if ( m_currentBackend != 0 && m_currentBackend->hasSoftSynths()) {
+    if ( m_currentBackend != nullptr && m_currentBackend->hasSoftSynths()) {
         connect( m_currentBackend, SIGNAL(softSynthStarted(const QString&,const QStringList&)),
                  SLOT(slotSoftSynthStarted(const QString&,const QStringList&)));
         connect( m_currentBackend, SIGNAL(softSynthErrors(const QString&,const QStringList&)),
@@ -244,9 +236,9 @@ void KMid2::initialize()
 
 void KMid2::setupActions()
 {
-    KAction* a;
+    QAction* a;
 
-    a = KStandardAction::quit(kapp, SLOT(quit()), actionCollection());
+    a = KStandardAction::quit(qApp, SLOT(quit()), actionCollection());
     a->setWhatsThis(i18nc("@info:whatsthis","Exit the application"));
     a = KStandardAction::open(this, SLOT(fileOpen()), actionCollection());
     a->setWhatsThis(i18nc("@info:whatsthis","Open a file from disk"));
@@ -255,17 +247,17 @@ void KMid2::setupActions()
     m_print = KStandardAction::print(this, SLOT(filePrint()), actionCollection());
     m_print->setWhatsThis(i18nc("@info:whatsthis","Print the lyrics"));
     m_recentFiles = KStandardAction::openRecent(this,
-            SLOT(slotURLSelected(const KUrl&)), actionCollection());
+            SLOT(slotURLSelected(const QUrl&)), actionCollection());
 
-    m_fileSaveLyrics = new KAction(this);
+    m_fileSaveLyrics = new QAction(this);
     m_fileSaveLyrics->setText(i18nc("@action:inmenu","Save Lyrics..."));
-    m_fileSaveLyrics->setIcon(KIcon("document-save-as"));
+    m_fileSaveLyrics->setIcon(QIcon::fromTheme(QStringLiteral("document-save-as")));
     connect(m_fileSaveLyrics, SIGNAL(triggered()), SLOT(fileSaveLyrics()));
     actionCollection()->addAction("file_save_lyrics", m_fileSaveLyrics);
 
-    m_play = new KAction(this);
+    m_play = new QAction(this);
     m_play->setText(i18nc("@action player play", "Play") );
-    m_play->setIcon(KIcon("media-playback-start"));
+    m_play->setIcon(QIcon::fromTheme(QStringLiteral("media-playback-start")));
     m_play->setShortcut( Qt::Key_MediaPlay );
     m_play->setWhatsThis(i18nc("@info:whatsthis","Start playback of the current session"));
     m_play->setEnabled(false);
@@ -274,70 +266,70 @@ void KMid2::setupActions()
 
     m_pause = new KToggleAction(this);
     m_pause->setText(i18nc("@action player pause", "Pause") );
-    m_pause->setIcon(KIcon("media-playback-pause"));
+    m_pause->setIcon(QIcon::fromTheme(QStringLiteral("media-playback-pause")));
     m_pause->setWhatsThis(i18nc("@info:whatsthis","Pause the playback"));
     m_pause->setEnabled(false);
     connect(m_pause, SIGNAL(triggered()), SLOT(pause()));
     actionCollection()->addAction("pause", m_pause);
 
-    m_next = new KAction(this);
+    m_next = new QAction(this);
     m_next->setText(i18nc("@action player next song", "Next song") );
-    m_next->setIcon(KIcon("media-skip-forward"));
+    m_next->setIcon(QIcon::fromTheme(QStringLiteral("media-skip-forward")));
     m_next->setShortcut( Qt::Key_MediaNext );
     m_next->setWhatsThis(i18nc("@info:whatsthis","Next song"));
     m_next->setEnabled(false);
     connect(m_next, SIGNAL(triggered()), SLOT(next()));
     actionCollection()->addAction("next", m_next);
 
-    m_previous = new KAction(this);
+    m_previous = new QAction(this);
     m_previous->setText(i18nc("@action player previous song", "Previous song") );
-    m_previous->setIcon(KIcon("media-skip-backward"));
+    m_previous->setIcon(QIcon::fromTheme(QStringLiteral("media-skip-backward")));
     m_previous->setShortcut( Qt::Key_MediaPrevious );
     m_previous->setWhatsThis(i18nc("@info:whatsthis","Previous song"));
     m_previous->setEnabled(false);
     connect(m_previous, SIGNAL(triggered()), SLOT(previous()));
     actionCollection()->addAction("previous", m_previous);
 
-    m_forward = new KAction(this);
+    m_forward = new QAction(this);
     m_forward->setText(i18nc("@action player skip forward", "Forward") );
-    m_forward->setIcon(KIcon("media-seek-forward"));
+    m_forward->setIcon(QIcon::fromTheme(QStringLiteral("media-seek-forward")));
     m_forward->setWhatsThis(i18nc("@info:whatsthis", "Player seek forward"));
     m_forward->setEnabled(false);
     connect(m_forward, SIGNAL(triggered()), SLOT(forward()));
     actionCollection()->addAction("forward", m_forward);
 
-    m_rewind = new KAction(this);
+    m_rewind = new QAction(this);
     m_rewind->setText(i18nc("@action player skip backward", "Rewind") );
-    m_rewind->setIcon(KIcon("media-seek-backward"));
+    m_rewind->setIcon(QIcon::fromTheme(QStringLiteral("media-seek-backward")));
     m_rewind->setWhatsThis(i18nc("@info:whatsthis", "Player seek backward"));
     m_rewind->setEnabled(false);
     connect(m_rewind, SIGNAL(triggered()), SLOT(rewind()));
     actionCollection()->addAction("backward", m_rewind);
 
-    m_stop = new KAction(this);
+    m_stop = new QAction(this);
     m_stop->setText(i18nc("@action player stop", "Stop") );
-    m_stop->setIcon(KIcon("media-playback-stop"));
+    m_stop->setIcon(QIcon::fromTheme(QStringLiteral("media-playback-stop")));
     m_stop->setShortcut( Qt::Key_MediaStop );
     m_stop->setWhatsThis(i18nc("@info:whatsthis","Stop playback or recording") );
     m_stop->setEnabled(false);
     connect(m_stop, SIGNAL(triggered()), SLOT(stop()));
     actionCollection()->addAction("stop", m_stop);
 
-    m_fileInfo = new KAction(this);
+    m_fileInfo = new QAction(this);
     m_fileInfo->setText(i18nc("@action:inmenu","File info..."));
-    m_fileInfo->setIcon(KIcon("document-properties"));
+    m_fileInfo->setIcon(QIcon::fromTheme(QStringLiteral("document-properties")));
     connect(m_fileInfo, SIGNAL(triggered()), SLOT(slotFileInfo()));
     actionCollection()->addAction("file_info", m_fileInfo);
 
     m_loop = new KToggleAction(this);
     m_loop->setText(i18nc("@action playlist repeat", "Repeat") );
-    m_loop->setIcon(KIcon("media-playlist-repeat"));
+    m_loop->setIcon(QIcon::fromTheme(QStringLiteral("media-playlist-repeat")));
     m_loop->setChecked(m_settings->player_loop());
     actionCollection()->addAction("loop", m_loop);
 
     m_shuffle = new KToggleAction(this);
     m_shuffle->setText(i18nc("@action playlist shuffle", "Shuffle") );
-    m_shuffle->setIcon(KIcon("media-playlist-shuffle"));
+    m_shuffle->setIcon(QIcon::fromTheme(QStringLiteral("media-playlist-shuffle")));
     m_shuffle->setChecked(m_settings->playlist_shuffle());
     connect(m_shuffle, SIGNAL(toggled(bool)), SLOT(slotShuffle(bool)));
     actionCollection()->addAction("shuffle", m_shuffle);
@@ -351,21 +343,21 @@ void KMid2::setupActions()
     m_playListAuto->setText(i18nc("@action", "Auto-Add to Playlist") );
     actionCollection()->addAction("autoadd_playlist", m_playListAuto);
 
-    m_playListLoad = new KAction(this);
+    m_playListLoad = new QAction(this);
     m_playListLoad->setText(i18nc("@action","Load Playlist...") );
-    m_playListLoad->setIcon(KIcon("document-open"));
+    m_playListLoad->setIcon(QIcon::fromTheme(QStringLiteral("document-open")));
     connect(m_playListLoad, SIGNAL(triggered()), SLOT(slotLoadPlaylist()));
     actionCollection()->addAction("load_playlist", m_playListLoad);
 
-    m_playListSave = new KAction(this);
+    m_playListSave = new QAction(this);
     m_playListSave->setText(i18nc("@action","Save Playlist...") );
-    m_playListSave->setIcon(KIcon("document-save"));
+    m_playListSave->setIcon(QIcon::fromTheme(QStringLiteral("document-save")));
     connect(m_playListSave, SIGNAL(triggered()), SLOT(slotSavePlaylist()));
     actionCollection()->addAction("save_playlist", m_playListSave);
 
-    m_playListEdit = new KAction(this);
+    m_playListEdit = new QAction(this);
     m_playListEdit->setText(i18nc("@action","Edit Playlist..." ));
-    m_playListEdit->setIcon(KIcon("view-media-playlist"));
+    m_playListEdit->setIcon(QIcon::fromTheme(QStringLiteral("view-media-playlist")));
     connect(m_playListEdit, SIGNAL(triggered()), SLOT(slotManagePlaylist()));
     actionCollection()->addAction("edit_playlist", m_playListEdit);
 
@@ -381,16 +373,16 @@ void KMid2::setupActions()
     connect(m_showChannels, SIGNAL(toggled(bool)), SLOT(slotShowChannels(bool)));
     actionCollection()->addAction("show_channels", m_showChannels);
 
-    m_loadSongSettings = new KAction(this);
+    m_loadSongSettings = new QAction(this);
     m_loadSongSettings->setText(i18nc("@action load song settings","Load"));
-    m_loadSongSettings->setIcon(KIcon("document-open"));
+    m_loadSongSettings->setIcon(QIcon::fromTheme(QStringLiteral("document-open")));
     m_loadSongSettings->setWhatsThis(i18nc("@info:whatsthis", "Load the stored settings for the current song"));
     connect(m_loadSongSettings, SIGNAL(triggered()), SLOT(slotLoadSongSettings()));
     actionCollection()->addAction("load_songsettings", m_loadSongSettings);
 
-    m_saveSongSettings = new KAction(this);
+    m_saveSongSettings = new QAction(this);
     m_saveSongSettings->setText(i18nc("@action save song settings","Save"));
-    m_saveSongSettings->setIcon(KIcon("document-save"));
+    m_saveSongSettings->setIcon(QIcon::fromTheme(QStringLiteral("document-save")));
     m_saveSongSettings->setWhatsThis(i18nc("@info:whatsthis", "Save the settings of the current song"));
     connect(m_saveSongSettings, SIGNAL(triggered()), SLOT(slotSaveSongSettings()));
     actionCollection()->addAction("save_songsettings", m_saveSongSettings);
@@ -404,31 +396,36 @@ void KMid2::setupActions()
 
 void KMid2::fileOpen()
 {
-    KUrl::List urls = KFileDialog::getOpenUrls(
-            KUrl("kfiledialog:///KMid2Song"), "audio/midi",
-            this, i18nc("@title:window","Open MIDI/Karaoke files"));
+    QList<QUrl> urls = QFileDialog::getOpenFileUrls(
+            this, i18nc("@title:window","Open MIDI/Karaoke files"),
+            QUrl(), QStringLiteral("MIDI files (*.mid *.midi *.kar);;All files (*)"));
     setPlayList(urls);
 }
 
-void KMid2::setPlayList(const KUrl::List &urls)
+void KMid2::setPlayList(const QList<QUrl> &urls)
 {
     QList<QUrl> list;
-    if (!urls.empty() && (m_midiobj != 0)) {
+    if (!urls.empty() && (m_midiobj != nullptr)) {
         stop();
         if (m_autoSongSettings->isChecked())
             slotSaveSongSettings();
         if (m_playListAuto->isChecked())
-            foreach(const QString& s, m_midiobj->queue())
-                list += KUrl(s);
-        foreach(const KUrl& u, urls)
+            for (const QString& s : m_midiobj->queue())
+                list += QUrl(s);
+        for (const QUrl& u : urls)
             list += u;
         if (m_shuffle->isChecked())
             std::random_shuffle(list.begin(), list.end());
         m_midiobj->setQueue(list);
-        m_midiobj->setCurrentSource(urls.first().prettyUrl());
-        foreach(const KUrl& u, urls)
+        m_midiobj->setCurrentSource(urls.first().toLocalFile());
+        for (const QUrl& u : urls)
             m_recentFiles->addUrl(u);
     }
+}
+
+void KMid2::setUrlsLater(const QList<QUrl> &urls)
+{
+    m_pendingList = urls;
 }
 
 void KMid2::dragEnterEvent( QDragEnterEvent * event )
@@ -440,14 +437,10 @@ void KMid2::dragEnterEvent( QDragEnterEvent * event )
 
 void KMid2::dropEvent( QDropEvent * event )
 {
-    if (event->mimeData()->hasUrls() && (m_midiobj != 0)) {
+    if (event->mimeData()->hasUrls() && (m_midiobj != nullptr)) {
         QList<QUrl> urls = event->mimeData()->urls();
         if (!urls.empty()) {
-            QStringList list;
-            foreach(const QUrl &u, urls) {
-                list.append( u.toString() );
-            }
-            setPlayList(list);
+            setPlayList(urls);
         }
         event->accept();
     }
@@ -471,7 +464,7 @@ void KMid2::slotSourceChanged(const QString &src)
     updateTempoLabel();
     m_seekamt = m_midiobj->totalTime() / 10;
     m_seeking = false;
-    if (m_pianola != 0) {
+    if (m_pianola != nullptr) {
         int loNote = m_midiobj->lowestMidiNote();
         int hiNote = m_midiobj->highestMidiNote();
         m_pianola->setNoteRange(loNote, hiNote);
@@ -480,7 +473,7 @@ void KMid2::slotSourceChanged(const QString &src)
             m_pianola->slotLabel(i, m_midiobj->channelLabel(i));
         }
     }
-    if (m_channels != 0)
+    if (m_channels != nullptr)
         for(int i = 0; i < MIDI_CHANNELS; ++i ) {
             m_midiout->setLocked(i, false);
             m_midiout->setMuted(i, false);
@@ -503,16 +496,16 @@ void KMid2::displayLyrics()
     qint64 time = m_midiobj->currentTime();
     if ( m_songEncoding.isEmpty() &&
          m_midiobj->guessTextEncoding() ) {
-            QByteArray encoding = m_midiobj->getTextEncoding().toLatin1();
-            foreach( const QString& name,
-                     KGlobal::charsets()->descriptiveEncodingNames() ) {
-                QString codecName = KGlobal::charsets()->encodingForName(name);
-                QTextCodec* codec = QTextCodec::codecForName(codecName.toLatin1());
-                if (codec != 0 && encoding == codec->name() ) {
-                    slotSelectEncoding(name);
-                    break;
-                }
+        QByteArray encoding = m_midiobj->getTextEncoding().toLatin1();
+        // Find matching codec name in available codecs
+        const auto codecs = QTextCodec::availableCodecs();
+        for (const QByteArray &codecName : codecs) {
+            QTextCodec* codec = QTextCodec::codecForName(codecName);
+            if (codec != nullptr && encoding == codec->name()) {
+                slotSelectEncoding(QString::fromLatin1(codecName));
+                break;
             }
+        }
     }
     QString s = m_midiobj->metaData("SMF_LYRICS").join("");
     if (s.isEmpty()) s = m_midiobj->metaData("SMF_TEXT").join("");
@@ -523,15 +516,14 @@ void KMid2::displayLyrics()
     if (s.isEmpty())
         return;
     m_lyricsText->setFont(m_settings->font());
-    m_lyricsText->setFontPointSize(m_settings->size());
-    m_lyricsText->setTextColor(kapp->palette().text().color());
-    m_lyricsText->setTextBackgroundColor(kapp->palette().color(QPalette::Disabled, QPalette::Background));
     m_lyricsText->setPlainText(s);
     if (time != 0) {
         m_lyricsText->moveCursor(QTextCursor::Start);
         s = m_midiobj->getLyrics(time).join("");
         if (m_lyricsText->find(s, QTextDocument::FindCaseSensitively)) {
-            m_lyricsText->setTextColor(m_settings->color());
+            QTextCharFormat fmt;
+            fmt.setForeground(m_settings->color());
+            m_lyricsText->textCursor().mergeCharFormat(fmt);
         }
         QTextCursor csr = m_lyricsText->textCursor();
         csr.clearSelection();
@@ -567,13 +559,13 @@ void KMid2::slotUpdateState( State newState, State /*oldState*/ )
 
 void KMid2::updateState(const QString &newState, const QString &stateName)
 {
-    setCaption(i18nc("@info:status", "<filename>%1</filename> [%2]", m_songName, stateName));
-    slotStateChanged(newState);
+    setCaption(i18nc("@info:status", "%1 [%2]", m_songName, stateName));
+    stateChanged(newState);
 }
 
 void KMid2::play()
 {
-    if (m_midiobj != 0) {
+    if (m_midiobj != nullptr) {
         slotCheckOutput();
         displayLyrics();
         m_midiobj->play();
@@ -583,7 +575,7 @@ void KMid2::play()
 
 void KMid2::pause()
 {
-    if (m_midiobj != 0) {
+    if (m_midiobj != nullptr) {
         if (m_midiobj->state() == PlayingState) {
             m_midiobj->pause();
             m_pianola->allNotesOff();
@@ -596,18 +588,18 @@ void KMid2::pause()
 
 void KMid2::stop()
 {
-    if (m_midiobj != 0)
+    if (m_midiobj != nullptr)
         m_midiobj->stop();
-    if (m_pianola != 0)
+    if (m_pianola != nullptr)
         m_pianola->allNotesOff();
-    if (m_channels != 0)
+    if (m_channels != nullptr)
         m_channels->allNotesOff();
     m_rtempo = 0;
 }
 
 void KMid2::forward()
 {
-    if (m_midiobj != 0) {
+    if (m_midiobj != nullptr) {
         qint64 s = m_midiobj->currentTime() + m_seekamt;
         if (s < m_midiobj->totalTime()) {
             m_timeSlider->setValue(s);
@@ -617,7 +609,7 @@ void KMid2::forward()
 
 void KMid2::rewind()
 {
-    if (m_midiobj != 0) {
+    if (m_midiobj != nullptr) {
         qint64 s = m_midiobj->currentTime() - m_seekamt;
         if (s > 0) {
             m_timeSlider->setValue(s);
@@ -630,7 +622,7 @@ void KMid2::finished()
     if (m_autoSongSettings->isChecked())
         slotSaveSongSettings();
     m_timeSlider->setValue(0);
-    if ((m_midiobj != 0) && m_loop->isChecked()) {
+    if ((m_midiobj != nullptr) && m_loop->isChecked()) {
         QStringList queue = m_midiobj->queue();
         if ((queue.count() > 0) &&
             (queue.indexOf(m_midiobj->currentSource()) == queue.count()-1))
@@ -641,10 +633,18 @@ void KMid2::finished()
 void KMid2::slotSelectEncoding(int i)
 {
     if (i <= 0)
-        m_songEncoding.clear(); // Default
-    else
-        m_songEncoding = KGlobal::charsets()->encodingForName(m_comboCodecs->itemText(i));
-    if (m_midiobj != 0)
+        m_songEncoding.clear();
+    else {
+        // Get codec name from combo item text
+        QString itemText = m_comboCodecs->itemText(i);
+        // Try to find codec by descriptive name
+        QTextCodec *codec = QTextCodec::codecForName(itemText.toLatin1());
+        if (codec)
+            m_songEncoding = QString::fromLatin1(codec->name());
+        else
+            m_songEncoding = itemText;
+    }
+    if (m_midiobj != nullptr)
         m_midiobj->setTextEncoding(m_songEncoding);
     displayLyrics();
 }
@@ -652,21 +652,25 @@ void KMid2::slotSelectEncoding(int i)
 void KMid2::slotSelectEncoding(const QString& encoding)
 {
     if (encoding.isEmpty()) {
-        m_songEncoding.clear(); // Default
+        m_songEncoding.clear();
         m_comboCodecs->setCurrentIndex(0);
     } else {
-        m_comboCodecs->setCurrentItem(encoding, false, 0);
-        m_songEncoding = KGlobal::charsets()->encodingForName(encoding);
+        int idx = m_comboCodecs->findText(encoding, Qt::MatchContains);
+        if (idx >= 0)
+            m_comboCodecs->setCurrentIndex(idx);
+        m_songEncoding = encoding;
     }
-    if (m_midiobj != 0)
+    if (m_midiobj != nullptr)
         m_midiobj->setTextEncoding(m_songEncoding);
 }
 
 void KMid2::slotMidiTextEvent(const int type, const QString &txt)
 {
-    if ( (type == 5) && // lyrics
+    if ( (type == 5) &&
          (m_lyricsText->find(txt.trimmed(), QTextDocument::FindCaseSensitively)) ) {
-        m_lyricsText->setTextColor(m_settings->color());
+        QTextCharFormat fmt;
+        fmt.setForeground(m_settings->color());
+        m_lyricsText->textCursor().mergeCharFormat(fmt);
         QRect r = m_lyricsText->cursorRect();
         QScrollBar *s = m_lyricsText->verticalScrollBar();
         int half = m_lyricsText->viewport()->height() / 2;
@@ -730,7 +734,7 @@ void KMid2::slotTimeSliderPressed()
 void KMid2::slotVolumeSlider(int value)
 {
     m_midiout->setVolume( -1, value*0.01 );
-    if (m_channels != 0)
+    if (m_channels != nullptr)
         m_channels->setVolumeFactor( value*0.01 );
     slotVolumeSliderMoved(value);
 }
@@ -762,6 +766,12 @@ void KMid2::slotTick(qint64 time)
     emit tick(time);
 }
 
+void KMid2::slotTempoChanged(qreal tempo)
+{
+    emit tempoEvent(tempo);
+    updateTempoLabel();
+}
+
 void KMid2::slotEditSettings()
 {
     if (KConfigDialog::exists("settings")) {
@@ -770,28 +780,33 @@ void KMid2::slotEditSettings()
         return;
     }
     KConfigDialog *dialog = new KConfigDialog( this, "settings", m_settings );
-    dialog->setHelp("configuration", KApplication::applicationName());
     QWidget *lyricsSettings = new QWidget(dialog);
     QWidget *midiSettings = new QWidget(dialog);
     ui_prefs_lyrics.setupUi(lyricsSettings);
     ui_prefs_midi.setupUi(midiSettings);
+    connect(ui_prefs_midi.connList, &QListWidget::currentItemChanged,
+            this, [this](QListWidgetItem *cur, QListWidgetItem *) {
+        if (cur != nullptr)
+            ui_prefs_midi.kcfg_output_connection->setText(cur->text());
+    });
     ui_prefs_midi.kcfg_midi_backend->setVisible(false);
-    foreach(const MidiBackend& backend, m_backends) {
+    for (const MidiBackend& backend : m_backends) {
         ui_prefs_midi.backendsCombo->addItem(backend.name);
         if (backend.library == m_settings->midi_backend())
-            ui_prefs_midi.backendsCombo->setCurrentItem(backend.name);
+            ui_prefs_midi.backendsCombo->setCurrentText(backend.name);
     }
     ui_prefs_midi.backendsCombo->setEnabled( m_backends.size() > 1 );
     ui_prefs_midi.kcfg_output_connection->setVisible(false);
-    QStringList maps = KGlobal::dirs()->findAllResources("appdata","*.map");
+    // Find MIDI map files
+    QStringList maps = QStandardPaths::locateAll(QStandardPaths::AppDataLocation, "*.map");
     ui_prefs_midi.mapsCombo->addItems(maps);
     ui_prefs_midi.mapsCombo->insertItem(0, QString());
-    ui_prefs_midi.mapsCombo->setCurrentItem(m_settings->midi_mapper());
+    ui_prefs_midi.mapsCombo->setCurrentText(m_settings->midi_mapper());
     ui_prefs_midi.kcfg_midi_mapper->setVisible(false);
     ui_prefs_midi.kcfg_sysex_file->setEnabled(m_settings->reset_mode() == Settings::Syx);
     dialog->addPage(lyricsSettings, i18nc("@title:group","Lyrics"), "format-text-color");
     dialog->addPage(midiSettings, i18nc("@title:group","MIDI"), "audio-midi");
-    if ( m_currentBackend != 0 && m_currentBackend->hasSoftSynths()) {
+    if ( m_currentBackend != nullptr && m_currentBackend->hasSoftSynths()) {
         QWidget *progsSettings = new QWidget(dialog);
         m_currentBackend->setupConfigurationWidget(progsSettings);
         dialog->addPage(progsSettings, i18nc("@title:group","Soft Synths"), "applications-system");
@@ -802,7 +817,6 @@ void KMid2::slotEditSettings()
             SLOT(slotModeChanged(int)));
     connect(ui_prefs_midi.backendsCombo, SIGNAL(activated(int)),
             SLOT(slotBackendChanged(int)));
-    //dialog->setAttribute( Qt::WA_DeleteOnClose );
     slotUpdateConfigDialogWidgets();
     dialog->show();
 }
@@ -811,14 +825,12 @@ void KMid2::slotApplySettings(const QString& name)
 {
     Q_UNUSED(name);
     QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
-
-    if ( m_currentBackend != 0 &&
+    if ( m_currentBackend != nullptr &&
          ( !m_currentBackend->hasSoftSynths() ||
            !m_currentBackend->applySoftSynthSettings() ))
         connectMidiOutput();
     else
         slotUpdateConfigDialogWidgets();
-
     QApplication::restoreOverrideCursor();
 }
 
@@ -845,51 +857,50 @@ void KMid2::slotUpdateConfigDialogWidgets()
     ui_prefs_midi.connList->clear();
     ui_prefs_midi.connList->addItems(lst);
     ui_prefs_midi.connList->setCurrentRow(m_midiout->outputDevice());
-
-    if ( m_currentBackend != 0 && m_currentBackend->hasSoftSynths())
+    if ( m_currentBackend != nullptr && m_currentBackend->hasSoftSynths())
         m_currentBackend->updateConfigWidget();
 }
 
 void KMid2::slotReadSettings()
 {
-    if ( m_currentBackend != 0 && m_currentBackend->hasSoftSynths())
+    if ( m_currentBackend != nullptr && m_currentBackend->hasSoftSynths())
         m_currentBackend->saveSettings();
 
-    if (m_recentFiles->urls().isEmpty()) {
-        KConfigGroup config = KGlobal::config()->group("RecentFiles");
-        m_recentFiles->loadEntries(config);
-    }
+    KConfigGroup config = KSharedConfig::openConfig()->group("RecentFiles");
+    m_recentFiles->loadEntries(config);
+
     QString mapperFile = m_settings->midi_mapper();
     if (mapperFile.isEmpty())
         m_mapper.clear();
     else {
         m_mapper.loadFile(mapperFile);
-        if (m_midiout != 0) m_midiout->setMidiMap(&m_mapper);
+        if (m_midiout != nullptr) m_midiout->setMidiMap(&m_mapper);
     }
     switch(m_settings->reset_mode()) {
     case Settings::None:
         m_resetMessage.clear();
         break;
     case Settings::GM:
-        m_resetMessage = QByteArray::fromRawData (
-                reinterpret_cast<const char *>(gmreset), sizeof(gmreset) );
+        m_resetMessage = QByteArray::fromRawData(
+                reinterpret_cast<const char *>(gmreset), sizeof(gmreset));
         break;
     case Settings::GS:
-        m_resetMessage = QByteArray::fromRawData (
-                reinterpret_cast<const char *>(gsreset), sizeof(gsreset) );
+        m_resetMessage = QByteArray::fromRawData(
+                reinterpret_cast<const char *>(gsreset), sizeof(gsreset));
         break;
     case Settings::XG:
-        m_resetMessage = QByteArray::fromRawData (
-                reinterpret_cast<const char *>(xgreset), sizeof(xgreset) );
+        m_resetMessage = QByteArray::fromRawData(
+                reinterpret_cast<const char *>(xgreset), sizeof(xgreset));
         break;
-    case Settings::Syx:
+    case Settings::Syx: {
         QFile file(m_settings->sysex_file().toLocalFile());
         file.open(QIODevice::ReadOnly);
         m_resetMessage = file.readAll();
         file.close();
         break;
     }
-    if (m_midiout != 0)
+    }
+    if (m_midiout != nullptr)
         m_midiout->setResetMessage(m_resetMessage);
     m_autoSongSettings->setChecked(m_settings->auto_song_settings());
     slotSelectEncoding(m_settings->encoding());
@@ -906,26 +917,25 @@ void KMid2::slotWriteSettings()
     m_settings->setPlayer_autostart(m_autostart->isChecked());
     m_settings->setAuto_song_settings(m_autoSongSettings->isChecked());
     if (m_settings->reset_mode() != Settings::Syx)
-        m_settings->setSysex_file(KUrl());
-    m_settings->writeConfig();
-    KConfigGroup config = KGlobal::config()->group("RecentFiles");
+        m_settings->setSysex_file(QUrl());
+    m_settings->save();
+    KConfigGroup config = KSharedConfig::openConfig()->group("RecentFiles");
     m_recentFiles->saveEntries(config);
     config.sync();
 }
 
-bool KMid2::queryExit()
+bool KMid2::queryClose()
 {
     stop();
-    if (m_midiout != 0) {
+    if (m_midiout != nullptr) {
         m_midiout->allNotesOff();
         m_midiout->resetControllers();
     }
     if (m_autoSongSettings->isChecked())
         slotSaveSongSettings();
-    if ( m_currentBackend != 0 &&
+    if ( m_currentBackend != nullptr &&
          m_currentBackend->hasSoftSynths() )
         m_currentBackend->terminateSoftSynths();
-
     slotWriteSettings();
     return true;
 }
@@ -936,54 +946,44 @@ void KMid2::slotFileInfo()
     if (m_midiobj->currentSource().isEmpty())
         infostr = i18nc("@info","No file loaded");
     else {
-        infostr = i18nc("@info","File: <filename>%1</filename><nl/>", m_songName);
-
-        QString s = m_midiobj->metaData("SMF_COPYRIGHT").join(i18nc("@info","<nl/>"));
+        infostr = i18nc("@info","File: %1\n", m_songName);
+        QString s = m_midiobj->metaData("SMF_COPYRIGHT").join("\n");
         if (!s.isEmpty())
-            infostr += i18nc("@info","Copyright: <emphasis>%1</emphasis><nl/>", s);
-
-        s = m_midiobj->metaData("KAR_FILETYPE").join(i18nc("@info","<nl/>"));
+            infostr += i18nc("@info","Copyright: %1\n", s);
+        s = m_midiobj->metaData("KAR_FILETYPE").join("\n");
         if (!s.isEmpty())
-            infostr += i18nc("@info","Karaoke type: <emphasis>%1</emphasis><nl/>", s);
-
-        s = m_midiobj->metaData("KAR_VERSION").join(i18nc("@info","<nl/>"));
+            infostr += i18nc("@info","Karaoke type: %1\n", s);
+        s = m_midiobj->metaData("KAR_VERSION").join("\n");
         if (!s.isEmpty())
-            infostr += i18nc("@info","Karaoke version: <emphasis>%1</emphasis><nl/>", s);
-
-        s = m_midiobj->metaData("KAR_INFORMATION").join(i18nc("@info","<nl/>"));
+            infostr += i18nc("@info","Karaoke version: %1\n", s);
+        s = m_midiobj->metaData("KAR_INFORMATION").join("\n");
         if (!s.isEmpty())
-            infostr += i18nc("@info","Karaoke info: <emphasis>%1</emphasis><nl/>", s);
-
-        s = m_midiobj->metaData("KAR_LANGUAGE").join(i18nc("@info","<nl/>"));
+            infostr += i18nc("@info","Karaoke info: %1\n", s);
+        s = m_midiobj->metaData("KAR_LANGUAGE").join("\n");
         if (!s.isEmpty())
-            infostr += i18nc("@info","Karaoke language: <emphasis>%1</emphasis><nl/>", s);
-
-        s = m_midiobj->metaData("KAR_TITLES").join(i18nc("@info","<nl/>"));
+            infostr += i18nc("@info","Karaoke language: %1\n", s);
+        s = m_midiobj->metaData("KAR_TITLES").join("\n");
         if (!s.isEmpty())
-            infostr += i18nc("@info","Karaoke title: <emphasis>%1</emphasis><nl/>", s);
-
-        s = m_midiobj->metaData("KAR_WARNINGS").join(i18nc("@info","<nl/>"));
+            infostr += i18nc("@info","Karaoke title: %1\n", s);
+        s = m_midiobj->metaData("KAR_WARNINGS").join("\n");
         if (!s.isEmpty())
-            infostr += i18nc("@info","Karaoke warnings: <emphasis>%1</emphasis><nl/>", s);
+            infostr += i18nc("@info","Karaoke warnings: %1\n", s);
     }
-    infostr.replace(QChar::LineSeparator, i18nc("@info","<nl/>"));
-    KMessageBox::information(this, infostr, i18nc("@title:window","Sequence Information"),
-            QString(), KMessageBox::Notify | KMessageBox::AllowLink );
+    KMessageBox::information(this, infostr, i18nc("@title:window","Sequence Information"));
 }
 
 void KMid2::fileSaveLyrics()
 {
     QString lyrics = m_lyricsText->toPlainText();
     if (!lyrics.isEmpty()) {
-        QString fileName = KFileDialog::getSaveFileName(
-                KUrl("kfiledialog:///KMid2Lyrics"), "text/plain",
-                this, i18nc("@title:window","Save lyrics to file"));
+        QString fileName = QFileDialog::getSaveFileName(
+                this, i18nc("@title:window","Save lyrics to file"),
+                QString(), QStringLiteral("Text files (*.txt);;All files (*)"));
         if (!fileName.isEmpty()) {
-            KSaveFile file(fileName);
-            file.open();
+            QSaveFile file(fileName);
+            file.open(QIODevice::WriteOnly);
             file.write(lyrics.toLocal8Bit());
-            file.finalize();
-            file.close();
+            file.commit();
         }
     }
 }
@@ -1023,40 +1023,12 @@ void KMid2::next()
 
 QString KMid2::chooseInitialConnection(const QStringList& items)
 {
-    QString result;
-    QPointer<KDialog> dialog = new KDialog(this);
-    dialog->setCaption( i18nc("@title:window", "MIDI Player connection") );
-    dialog->setButtons( KDialog::Ok | KDialog::Cancel | KDialog::Help );
-    dialog->setHelp("using-midi", KApplication::applicationName());
-    dialog->setDefaultButton(KDialog::Ok);
-    dialog->setModal(true);
-    dialog->showButtonSeparator(true);
-    QFrame *frame = new QFrame(dialog);
-    dialog->setMainWidget(frame);
-    QVBoxLayout *layout = new QVBoxLayout(frame);
-    QLabel *label = new QLabel(frame);
-    label->setText(i18nc("@info","You need to select one MIDI port if you want"
-        " to be able to listen sounds. This MIDI port may be a"
-        " software synthesizer like Timidity++ or FluidSynth, or an"
-        " external MIDI device, or a hardware synthesizer provided by"
-        " your sound card. This setting can be changed later, using"
-        " the Settings->Configure KMid->MIDI dialog."
-        " You can find more information in the <link url="
-        "'help:/kmid/general-usage.html#using-midi'>online help"
-        " documents</link><nl/>"
-        "Please select one MIDI port now:"));
-    label->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    label->setOpenExternalLinks(true);
-    label->setWordWrap(true);
-    layout->addWidget(label);
-    KComboBox *combo = new KComboBox(frame);
-    combo->setEditable(false);
-    combo->addItems(items);
-    combo->setCurrentIndex(-1);
-    layout->addWidget(combo);
-    if (dialog->exec() == KDialog::Accepted)
-        result = combo->currentText();
-    delete dialog;
+    bool ok;
+    QString result = QInputDialog::getItem(this,
+        i18nc("@title:window", "MIDI Player connection"),
+        i18nc("@info","Please select one MIDI port:"),
+        items, 0, false, &ok);
+    if (!ok) result.clear();
     return result;
 }
 
@@ -1064,20 +1036,14 @@ void KMid2::slotCheckOutput()
 {
     if (!m_connected || (m_midiout->outputDevice() < 0)) {
         QString item;
-
         QStringList items = m_midiout->outputDeviceList(!m_settings->advanced_ports());
         if (items.isEmpty()) {
             KMessageBox::sorry(this,
-                    i18nc("@info", "There are no available MIDI ports in your"
-                    " system. You can specify a software synthesizer, such as"
-                    " TiMidity++ or FluidSynth, to be launched automatically"
-                    " when KMid starts. This option is located in the dialog"
-                    " Settings->Configure KMid, programs category."
-                    " You can find more information in the <link url="
-                    "'help:/kmid/general-usage.html#using-midi'>online help"
-                    " documents</link>."),
-                    i18nc("@title:window", "MIDI Player connection"),
-                    KMessageBox::Notify | KMessageBox::AllowLink);
+                    i18nc("@info", "There are no available MIDI ports in your system. "
+                    "You can specify a software synthesizer, such as TiMidity++ or FluidSynth, "
+                    "to be launched automatically when KMid starts. "
+                    "This option is located in the dialog Settings->Configure KMid."),
+                    i18nc("@title:window", "MIDI Player connection"));
         } else {
             if ((items.count() == 1) && !m_settings->advanced_ports())
                 item = items.first();
@@ -1102,34 +1068,36 @@ void KMid2::loadPlaylist(const QString &fileName)
     while (!in.atEnd())
         list << in.readLine();
     if (!list.empty()) {
-        setPlayList(list);
+        QList<QUrl> urls;
+        for (const QString &s : list)
+            urls.append(QUrl::fromLocalFile(s));
+        setPlayList(urls);
         m_playList = fileName;
     }
 }
 
 void KMid2::slotLoadPlaylist()
 {
-    QString fileName = KFileDialog::getOpenFileName(
-            KUrl("kfiledialog:///KMid2PlayList"), "text/plain",
-            this, i18nc("@title:window","Open playlist from file"));
-    if (!fileName.isEmpty() && (m_midiobj != 0))
+    QString fileName = QFileDialog::getOpenFileName(
+            this, i18nc("@title:window","Open playlist from file"),
+            QString(), QStringLiteral("Text files (*.txt);;All files (*)"));
+    if (!fileName.isEmpty() && (m_midiobj != nullptr))
         loadPlaylist(fileName);
 }
 
 void KMid2::slotSavePlaylist()
 {
-    QString fileName = KFileDialog::getSaveFileName(
-            KUrl("kfiledialog:///KMid2PlayList"), "text/plain",
-            this, i18nc("@title:window","Save playlist to file"));
-    if ( !fileName.isEmpty() && (m_midiobj != 0) ) {
-        KSaveFile file( fileName );
-        file.open();
-        QTextStream stream( &file );
-        foreach(const QString& line, m_midiobj->queue())
-            stream << line << endl;
+    QString fileName = QFileDialog::getSaveFileName(
+            this, i18nc("@title:window","Save playlist to file"),
+            QString(), QStringLiteral("Text files (*.txt);;All files (*)"));
+    if ( !fileName.isEmpty() && (m_midiobj != nullptr) ) {
+        QSaveFile file(fileName);
+        file.open(QIODevice::WriteOnly);
+        QTextStream stream(&file);
+        for (const QString& line : m_midiobj->queue())
+            stream << line << "\n";
         stream.flush();
-        file.finalize();
-        file.close();
+        file.commit();
         m_playList = fileName;
     }
 }
@@ -1139,8 +1107,8 @@ void KMid2::slotManagePlaylist()
     QPointer<PlayListDialog> dialog = new PlayListDialog(this);
     dialog->setItems( m_midiobj->queue() );
     dialog->setCurrentItem( m_midiobj->currentSource() );
-    if (dialog->exec() == KDialog::Accepted) {
-        if (dialog != 0) {
+    if (dialog->exec() == QDialog::Accepted) {
+        if (dialog != nullptr) {
             stop();
             if (dialog->itemCount() > 0) {
                 m_midiobj->setQueue(dialog->items());
@@ -1182,7 +1150,7 @@ void KMid2::slotBeat(const int bars, const int beats, const int maxbeats)
     displayBeat(bars, beats);
 }
 
-void KMid2::slotTimeSignatureEvent(const int numerator, const int denominator )
+void KMid2::slotTimeSignatureEvent(const int numerator, const int denominator)
 {
     m_rhythm->setRhythm( numerator );
     Q_UNUSED(denominator)
@@ -1190,7 +1158,7 @@ void KMid2::slotTimeSignatureEvent(const int numerator, const int denominator )
 
 void KMid2::slotShowPianola(bool checked)
 {
-    if (m_pianola != 0)
+    if (m_pianola != nullptr)
         m_pianola->setVisible(checked);
 }
 
@@ -1201,7 +1169,7 @@ void KMid2::slotPianolaClosed()
 
 void KMid2::slotShowChannels(bool checked)
 {
-    if (m_channels != 0)
+    if (m_channels != nullptr)
         m_channels->setVisible(checked);
 }
 
@@ -1213,12 +1181,11 @@ void KMid2::slotChannelsClosed()
 void KMid2::setupDockWidgets()
 {
     /* Volume and Pitch dock */
-
     m_volDock = new QDockWidget(i18nc("@title:window", "Volume and Pitch"), this);
     m_volDock->setObjectName(QLatin1String("volumeAndPitchDock"));
     m_volDock->setFeatures(QDockWidget::DockWidgetClosable |
             QDockWidget::DockWidgetFloatable | QDockWidget::DockWidgetMovable |
-            QDockWidget::DockWidgetVerticalTitleBar );
+            QDockWidget::DockWidgetVerticalTitleBar);
     QWidget *dw = new QWidget(m_volDock);
     QGridLayout *gridLayout = new QGridLayout(dw);
 
@@ -1238,7 +1205,7 @@ void KMid2::setupDockWidgets()
     m_volumeSlider->setOrientation(Qt::Vertical);
     m_volumeSlider->setTickPosition(QSlider::TicksBelow);
     m_volumeSlider->setWhatsThis(i18nc("@info:whatsthis","MIDI master volume control"));
-    m_volumeSlider->setTracking( false );
+    m_volumeSlider->setTracking(false);
     gridLayout->addWidget(m_volumeSlider, 1, 0);
     labelVol->setBuddy(m_volumeSlider);
 
@@ -1250,7 +1217,7 @@ void KMid2::setupDockWidgets()
     m_pitchSlider->setOrientation(Qt::Vertical);
     m_pitchSlider->setTickPosition(QSlider::TicksBelow);
     m_pitchSlider->setWhatsThis(i18nc("@info:whatsthis","Note height transposition"));
-    m_pitchSlider->setTracking( false );
+    m_pitchSlider->setTracking(false);
     gridLayout->addWidget(m_pitchSlider, 1, 1);
     labelPitch->setBuddy(m_pitchSlider);
 
@@ -1259,15 +1226,14 @@ void KMid2::setupDockWidgets()
 
     QAction* action = m_volDock->toggleViewAction();
     action->setText(i18nc("@title:window", "Volume and Pitch"));
-    action->setIcon(KIcon("view-media-equalizer"));
+    action->setIcon(QIcon::fromTheme(QStringLiteral("view-media-equalizer")));
     action->setWhatsThis(i18nc("@action:inmenu","Show or hide the volume and pitch controls"));
     actionCollection()->addAction("show_volume_pitch", action);
 
-    connect ( m_volDock, SIGNAL(dockLocationChanged(Qt::DockWidgetArea)),
+    connect(m_volDock, SIGNAL(dockLocationChanged(Qt::DockWidgetArea)),
               SLOT(slotDockVolLocationChanged(Qt::DockWidgetArea)));
 
     /* Time Position dock */
-
     m_posDock = new QDockWidget(i18nc("@title:window", "Time Position"), this);
     m_posDock->setObjectName(QLatin1String("timeDock"));
     m_posDock->setAllowedAreas(Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea);
@@ -1280,11 +1246,11 @@ void KMid2::setupDockWidgets()
     m_timeSlider->setOrientation(Qt::Horizontal);
     m_timeSlider->setTickPosition(QSlider::TicksBelow);
     m_timeSlider->setWhatsThis(i18nc("@info:whatsthis","Time position control"));
-    m_timeSlider->setTracking( false );
+    m_timeSlider->setTracking(false);
     vLayout->addWidget(m_timeSlider);
 
     m_timeLabel = new TimeLabel(this);
-    m_timeLabel->setFont(KGlobalSettings::fixedFont());
+    m_timeLabel->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     m_timeLabel->setTotalTime(10000);
     m_timeLabel->setMarkers(8);
     vLayout->addWidget(m_timeLabel);
@@ -1294,31 +1260,36 @@ void KMid2::setupDockWidgets()
 
     action = m_posDock->toggleViewAction();
     action->setText(i18nc("@title:window", "Time Position"));
-    action->setIcon(KIcon("player-time"));
+    action->setIcon(QIcon::fromTheme(QStringLiteral("player-time")));
     action->setWhatsThis(i18nc("@action:inmenu","Show or hide the time position controls"));
     actionCollection()->addAction("show_position", action);
 
     /* Codecs dock */
-
     m_encDock = new QDockWidget(i18nc("@title:window", "Text Encoding"), this);
     m_encDock->setObjectName(QLatin1String("codecsDock"));
 
-    m_comboCodecs = new KComboBox(this);
+    m_comboCodecs = new QComboBox(this);
     m_comboCodecs->setWhatsThis(i18nc("@info:whatsthis","Character encoding for lyrics and other text"));
     m_comboCodecs->addItem(i18nc("@item:inlistbox Default MIDI text encoding", "Default ( ASCII )"));
-    m_comboCodecs->addItems( KGlobal::charsets()->descriptiveEncodingNames() );
-    m_comboCodecs->setCurrentItem(m_settings->encoding());
+    // Add available text codecs
+    const auto codecs = QTextCodec::availableCodecs();
+    QStringList codecNames;
+    for (const QByteArray &name : codecs)
+        codecNames << QString::fromLatin1(name);
+    codecNames.sort();
+    m_comboCodecs->addItems(codecNames);
+    int idx = m_comboCodecs->findText(m_settings->encoding(), Qt::MatchContains);
+    if (idx >= 0) m_comboCodecs->setCurrentIndex(idx);
     m_encDock->setWidget(m_comboCodecs);
     addDockWidget(Qt::TopDockWidgetArea, m_encDock);
 
     action = m_encDock->toggleViewAction();
     action->setText(i18nc("@title:window", "Text Encoding"));
-    action->setIcon(KIcon("view-list-text"));
+    action->setIcon(QIcon::fromTheme(QStringLiteral("view-list-text")));
     action->setWhatsThis(i18nc("@action:inmenu","Show or hide the character encoding control"));
     actionCollection()->addAction("show_codecs", action);
 
     /* Rhythm dock */
-
     m_rthmDock = new QDockWidget(i18nc("@title:window", "Rhythm"), this);
     m_rthmDock->setObjectName(QLatin1String("rhythmDock"));
     m_rthmDock->setAllowedAreas(Qt::TopDockWidgetArea | Qt::BottomDockWidgetArea);
@@ -1330,7 +1301,7 @@ void KMid2::setupDockWidgets()
     gridLayout->addWidget(labelSpeed, 0, 0);
 
     m_labelTempo = new QLabel(this);
-    m_labelTempo->setFont(KGlobalSettings::fixedFont());
+    m_labelTempo->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     m_labelTempo->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
     m_labelTempo->setTextInteractionFlags(Qt::NoTextInteraction);
     m_labelTempo->setText(i18nc("@label:slider bpm=beats per minute","120.0 bpm"));
@@ -1345,7 +1316,7 @@ void KMid2::setupDockWidgets()
     m_tempoSlider->setOrientation(Qt::Horizontal);
     m_tempoSlider->setTickPosition(QSlider::TicksAbove);
     m_tempoSlider->setWhatsThis(i18nc("@info:whatsthis","Tempo (song speed) control, between 50% and 200%"));
-    m_tempoSlider->setTracking( false );
+    m_tempoSlider->setTracking(false);
     gridLayout->addWidget(m_tempoSlider, 0, 2);
 
     m_btnResetTempo = new QPushButton(this);
@@ -1358,7 +1329,7 @@ void KMid2::setupDockWidgets()
     gridLayout->addWidget(labelMetronome, 1, 0);
 
     m_labelBeatCount = new QLabel(this);
-    m_labelBeatCount->setFont(KGlobalSettings::fixedFont());
+    m_labelBeatCount->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     m_labelBeatCount->setText(QLatin1String("1:01"));
     m_labelBeatCount->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
     m_labelBeatCount->setTextInteractionFlags(Qt::NoTextInteraction);
@@ -1368,20 +1339,19 @@ void KMid2::setupDockWidgets()
     m_rhythm = new RhythmView(this);
     m_rhythm->setFixedHeight(10);
     m_rhythm->setWhatsThis(i18nc("@info:whatsthis","Visual metronome"));
-    gridLayout->addWidget(m_rhythm, 1, 2, 1, 1, Qt::AlignVCenter);;
+    gridLayout->addWidget(m_rhythm, 1, 2, 1, 1, Qt::AlignVCenter);
 
     m_rthmDock->setWidget(dw);
     addDockWidget(Qt::BottomDockWidgetArea, m_rthmDock);
 
     action = m_rthmDock->toggleViewAction();
     action->setText(i18nc("@title:window", "Rhythm"));
-    action->setIcon(KIcon("chronometer"));
+    action->setIcon(QIcon::fromTheme(QStringLiteral("chronometer")));
     action->setWhatsThis(i18nc("@action:inmenu","Show or hide the rhythm controls"));
     actionCollection()->addAction("show_rhythm", action);
 
     /* Central Widget */
-
-    m_lyricsText = new KTextEdit(this);
+    m_lyricsText = new QTextEdit(this);
     m_lyricsText->setReadOnly(true);
     m_lyricsText->setTextInteractionFlags(Qt::NoTextInteraction);
     m_lyricsText->setWhatsThis(i18nc("@info:whatsthis","Song lyrics, or some other text"));
@@ -1389,47 +1359,27 @@ void KMid2::setupDockWidgets()
     setCentralWidget(m_lyricsText);
 }
 
-void KMid2::slotURLSelected(const KUrl& url)
-{
-    KUrl::List urls;
-    urls.append(url);
-    setPlayList(urls);
-}
-
 void KMid2::setupPlaces()
 {
-    KFilePlacesModel *placesModel = new KFilePlacesModel;
-    QString filter("*.mid");
+    // In KF5, KFilePlacesModel is available but we skip auto-adding places
+    // as it requires more complex setup. Users can add places manually.
+}
 
-    // search kmid examples
-    QStringList midis = KGlobal::dirs()->findAllResources("appdata", filter);
-    if (!midis.empty()) {
-        QFileInfo info(midis.first());
-        KUrl samples(info.absolutePath());
-        if (placesModel->url(placesModel->closestItem(samples)) != samples) {
-            placesModel->addPlace(i18nc("@label","Sample Songs"), samples,
-                KApplication::applicationName(), KApplication::applicationName());
-        }
-    }
-
-    // search for system MIDI files
-    midis = KGlobal::dirs()->findAllResources("sound", filter, KStandardDirs::Recursive);
-    if (!midis.empty()) {
-        QFileInfo info(midis.first());
-        KUrl globals(info.absolutePath());
-        if (placesModel->url(placesModel->closestItem(globals)) != globals) {
-            placesModel->addPlace(i18nc("@label","System Songs"), globals,
-                "audio-midi", KApplication::applicationName());
-        }
-    }
-    delete placesModel;
+void KMid2::slotURLSelected(const QUrl& url)
+{
+    QList<QUrl> urls;
+    urls.append(url);
+    setPlayList(urls);
 }
 
 void KMid2::slotSaveSongSettings()
 {
     if (!m_songName.isEmpty()) {
         QString fileName = QString("songlib/%1.cfg").arg(m_songName);
-        KConfig songSettings(KStandardDirs::locateLocal("appdata", fileName, true));
+        QString localPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                            + "/" + fileName;
+        QDir().mkpath(QFileInfo(localPath).absolutePath());
+        KConfig songSettings(localPath);
         KConfigGroup grp = songSettings.group("Global");
         grp.writeEntry("file", m_midiobj->currentSource());
         grp.writeEntry("encoding", m_comboCodecs->currentText());
@@ -1456,9 +1406,10 @@ void KMid2::slotLoadSongSettings()
     bool locked, muted, solo;
     if (!m_songName.isEmpty()) {
         QString fileName = QString("songlib/%1.cfg").arg(m_songName);
-        KConfig songSettings(KStandardDirs::locateLocal("appdata", fileName, false));
+        QString localPath = QStandardPaths::locate(QStandardPaths::AppDataLocation, fileName);
+        if (localPath.isEmpty()) return;
+        KConfig songSettings(localPath);
         KConfigGroup grp = songSettings.group("Global");
-        QString filename = grp.readEntry("file", QString());
         QString encoding = grp.readEntry("encoding", QString());
         if (!encoding.isEmpty())
             slotSelectEncoding(encoding);
@@ -1481,24 +1432,20 @@ void KMid2::slotLoadSongSettings()
                 grp = songSettings.group(grpName);
                 QString name = grp.readEntry("name", QString());
                 if (name.isEmpty())
-                    name =  m_midiobj->channelLabel(i);
+                    name = m_midiobj->channelLabel(i);
                 if (!name.isEmpty()) {
                     m_channels->setChannelName(i, name);
                     m_pianola->slotLabel(i, name);
                 }
-
                 muted = grp.readEntry("muted", false);
                 m_midiout->setMuted(i, muted);
                 m_channels->setMuteChannel(i, muted);
-
                 solo = grp.readEntry("solo", false);
                 m_channels->setSoloChannel(i, solo);
-
                 pgm = grp.readEntry("patch", -1);
                 m_channels->setPatchChannel(i, pgm);
                 if (pgm > -1)
                     m_midiout->sendProgram(i, pgm);
-
                 locked = grp.readEntry("locked", false);
                 m_channels->setLockChannel(i, locked);
                 m_midiout->setLocked(i, locked);
@@ -1511,12 +1458,9 @@ void KMid2::slotLoadSongSettings()
 void KMid2::slotSoftSynthErrors(const QString& pgm, const QStringList& messages)
 {
     KMessageBox::error(this,
-        i18ncp("@info", "Failed to run %2 with the provided "
-                "arguments.<nl/>Returned message:<nl/>%3",
-                "Failed to run %2 with the provided "
-                "arguments.<nl/>Returned messages:<nl/>%3",
-                messages.size(),
-                pgm, messages.join("<nl/>")),
+        i18ncp("@info", "Failed to run %2 with the provided arguments. Returned message: %3",
+                "Failed to run %2 with the provided arguments. Returned messages: %3",
+                messages.size(), pgm, messages.join("\n")),
         i18nc("@title:window", "%1 startup failed", pgm));
 }
 
@@ -1539,16 +1483,11 @@ void KMid2::slotSoftSynthStarted(const QString& pgm, const QStringList& messages
 {
     if (!messages.isEmpty())
         KMessageBox::informationList(this,
-            i18ncp("@info", "%2 has returned the following message "
-                    "when launched with the provided arguments.",
-                    "%2 has returned the following messages "
-                    "when launched with the provided arguments.",
-                    messages.size(),
-                    pgm),
+            i18ncp("@info", "%2 has returned the following message when launched with the provided arguments.",
+                    "%2 has returned the following messages when launched with the provided arguments.",
+                    messages.size(), pgm),
             messages,
-            i18ncp("@title:window", "%2 message", "%2 messages",
-                    messages.size(),
-                    pgm),
+            i18ncp("@title:window", "%2 message", "%2 messages", messages.size(), pgm),
             "softsynth_warnings");
     connectMidiOutput();
 }
@@ -1558,9 +1497,9 @@ void KMid2::readProperties(const KConfigGroup &cfg)
     QString currentSource = cfg.readEntry("CurrentSource", QString());
     QString playList = cfg.readEntry("PlayList", QString());
     bool wasPlaying = cfg.readEntry("Playing", false);
-    if (!playList.isEmpty() && (m_midiobj != 0))
+    if (!playList.isEmpty() && (m_midiobj != nullptr))
         loadPlaylist(playList);
-    if (playList.isEmpty() && !currentSource.isEmpty() && (m_midiobj != 0))
+    if (playList.isEmpty() && !currentSource.isEmpty() && (m_midiobj != nullptr))
         m_midiobj->setCurrentSource(currentSource);
     if (wasPlaying && !m_settings->player_autostart())
         play();
@@ -1572,11 +1511,6 @@ void KMid2::saveProperties(KConfigGroup &cfg)
     cfg.writeEntry("CurrentSource", m_midiobj->currentSource());
     cfg.writeEntry("PlayList", m_playList);
     cfg.writeEntry("Playing", playing);
-}
-
-void KMid2::setUrlsLater(const KUrl::List &urls)
-{
-    m_pendingList = urls;
 }
 
 void KMid2::showEvent(QShowEvent* event)
@@ -1600,181 +1534,96 @@ void KMid2::slotDockVolLocationChanged(Qt::DockWidgetArea area)
         m_volumeSlider->setTickPosition(QSlider::TicksBelow);
         m_pitchSlider->setOrientation(Qt::Vertical);
         m_pitchSlider->setTickPosition(QSlider::TicksBelow);
-    } else { // top or bottom
+    } else {
         m_volumeSlider->setOrientation(Qt::Horizontal);
-        m_volumeSlider->setTickPosition(QSlider::TicksAbove);
+        m_volumeSlider->setTickPosition(QSlider::TicksBelow);
         m_pitchSlider->setOrientation(Qt::Horizontal);
-        m_pitchSlider->setTickPosition(QSlider::TicksAbove);
+        m_pitchSlider->setTickPosition(QSlider::TicksBelow);
     }
     m_volDock->setFeatures(flags);
 }
 
-/* DBus interface */
-
-void KMid2::reload()
-{
-    if (m_midiobj != 0) {
-        if (m_midiobj->state() == PlayingState)
-            stop();
-        qint64 curpos = m_midiobj->currentTime();
-        QString cursrc = m_midiobj->currentSource();
-        if (!cursrc.isEmpty()) {
-            m_midiobj->clear();
-            m_midiobj->setCurrentSource(cursrc);
-            m_timeSlider->setValue(curpos);
-        }
-    }
-}
-
-QStringList KMid2::metaData(const QString& key)
-{
-    if (m_midiobj != 0)
-        return m_midiobj->metaData(key);
-    return QStringList();
-}
-
-bool KMid2::isMuted(int channel)
-{
-    if (m_midiout != 0)
-        return m_midiout->isMuted(channel);
-    return false;
-}
-
-void KMid2::setMuted(int channel, bool muted)
-{
-    if (m_channels != 0)
-        m_channels->setMuteChannel(channel, muted);
-}
-
-bool KMid2::autoStart()
-{
-    return m_autostart->isChecked();
-}
-
-bool KMid2::isLooping()
-{
-    return m_loop->isChecked();
-}
-
-qlonglong KMid2::length()
-{
-    if (m_midiobj != 0)
-        return m_midiobj->totalTime();
-    return 0;
-}
-
-QString KMid2::midiConnection()
-{
-    if (m_midiout != 0)
-        return m_midiout->outputDeviceName();
+// DBus property accessors
+bool KMid2::autoStart() { return m_autostart->isChecked(); }
+void KMid2::setAutoStart(bool enable) { m_autostart->setChecked(enable); }
+QString KMid2::midiConnection() {
+    if (m_midiout) return m_midiout->outputDeviceName();
     return QString();
 }
-
-bool KMid2::openUrl(const QString& url)
-{
-    if (m_midiobj != 0) {
-        m_midiobj->setCurrentSource(url);
-        return true;
+void KMid2::setMidiConnection(const QString& conn) {
+    if (m_midiout) {
+        if (m_midiout->setOutputDeviceName(conn))
+            m_settings->setOutput_connection(conn);
     }
-    return false;
 }
-
-qlonglong KMid2::position()
-{
-    if (m_midiobj != 0)
-        return m_midiobj->currentTime();
-    return 0;
-}
-
-void KMid2::seek(qlonglong pos)
-{
-    if ((m_midiobj != 0) && (pos < m_midiobj->totalTime()))
-        m_timeSlider->setValue(pos);
-}
-
-void KMid2::setAutoStart(bool arg)
-{
-    m_autostart->setChecked(arg);
-}
-
-void KMid2::setLooping(bool arg)
-{
-    m_loop->setChecked(arg);
-}
-
-void KMid2::setMidiConnection(const QString& conn)
-{
-    if (m_midiout != 0)
-        m_midiout->setOutputDeviceName(conn);
-}
-
-void KMid2::setTempoFactor(double factor)
-{
-    if ((factor >= .5) && (factor <= 2.0))
-        m_tempoSlider->setValue(50*(sqrt(factor*16-7)-1));
-}
-
-void KMid2::setTranspose(int amount)
-{
-    if ((amount >= -12) && (amount <= 12))
-        m_pitchSlider->setValue(amount);
-}
-
-void KMid2::setVolumeFactor(double factor)
-{
-    if ((factor >= 0) && (factor <= 2.0))
-        m_volumeSlider->setValue(factor * 100);
-}
-
-int KMid2::state()
-{
-    if (m_midiobj != 0)
-        return m_midiobj->state();
-    return ErrorState;
-}
-
-double KMid2::tempoFactor()
-{
-    if (m_midiobj != 0)
-        return m_midiobj->timeSkew();
+double KMid2::tempoFactor() {
+    if (m_midiobj) return m_midiobj->timeSkew();
     return 1.0;
 }
-
-int KMid2::transpose()
-{
-    if (m_midiout != 0)
-        return m_midiout->pitchShift();
+void KMid2::setTempoFactor(double factor) {
+    if (m_midiobj) m_midiobj->setTimeSkew(factor);
+}
+double KMid2::volumeFactor() { return m_volumeSlider->value() * 0.01; }
+void KMid2::setVolumeFactor(double factor) { m_volumeSlider->setValue(factor * 100); }
+int KMid2::transpose() {
+    if (m_midiout) return m_midiout->pitchShift();
     return 0;
 }
-
-double KMid2::volumeFactor()
-{
-    return (m_volumeSlider->value() / 100.0);
+void KMid2::setTranspose(int amount) {
+    if (m_midiout) m_midiout->setPitchShift(amount);
 }
-
-QString KMid2::currentSource() const
-{
-    if (m_midiobj != 0)
-        return m_midiobj->currentSource();
+qlonglong KMid2::length() {
+    if (m_midiobj) return m_midiobj->totalTime();
+    return 0;
+}
+bool KMid2::isLooping() { return m_loop->isChecked(); }
+void KMid2::setLooping(bool enable) { m_loop->setChecked(enable); }
+qlonglong KMid2::position() {
+    if (m_midiobj) return m_midiobj->currentTime();
+    return 0;
+}
+int KMid2::state() {
+    if (m_midiobj) return m_midiobj->state();
+    return ErrorState;
+}
+QString KMid2::currentSource() const {
+    if (m_midiobj) return m_midiobj->currentSource();
     return QString();
 }
-
-void KMid2::slotTempoChanged(qreal tempo)
-{
-    updateTempoLabel();
-    emit tempoEvent(tempo);
+bool KMid2::openUrl(const QString& url) {
+    QList<QUrl> urls;
+    urls.append(QUrl::fromUserInput(url));
+    setPlayList(urls);
+    return true;
 }
-
-QDBusVariant KMid2::songProperty(const QString& key)
-{
-    if (m_midiobj != 0)
-        return QDBusVariant(m_midiobj->songProperty(key));
+bool KMid2::isMuted(int channel) {
+    if (m_midiout) return m_midiout->isMuted(channel);
+    return false;
+}
+void KMid2::setMuted(int channel, bool muted) {
+    if (m_midiout) m_midiout->setMuted(channel, muted);
+}
+QStringList KMid2::metaData(const QString& key) {
+    if (m_midiobj) return m_midiobj->metaData(key);
+    return QStringList();
+}
+QDBusVariant KMid2::songProperty(const QString& key) {
+    if (m_midiobj) return QDBusVariant(m_midiobj->songProperty(key));
     return QDBusVariant();
 }
-
-QDBusVariant KMid2::channelProperty(int channel, const QString& key)
-{
-    if (m_midiobj != 0)
-        return QDBusVariant(m_midiobj->channelProperty(channel, key));
+QDBusVariant KMid2::channelProperty(int channel, const QString& key) {
+    if (m_midiobj) return QDBusVariant(m_midiobj->channelProperty(channel, key));
     return QDBusVariant();
+}
+void KMid2::seek(qlonglong pos) {
+    if (m_midiobj) m_midiobj->seek(pos);
+}
+void KMid2::reload() {
+    if (m_midiobj) {
+        QString src = m_midiobj->currentSource();
+        if (!src.isEmpty()) {
+            stop();
+            m_midiobj->setCurrentSource(src);
+        }
+    }
 }

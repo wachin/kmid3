@@ -1,33 +1,22 @@
 /*
-    KMid2 MIDI/Karaoke Player
+    KMid2 MIDI/Karaoke Player - Updated for KDE5/Qt5
     Copyright (C) 2009-2010 Pedro Lopez-Cabanillas <plcl@users.sf.net>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #include "kmid_partview.h"
 
-#include <KLocale>
-#include <KDebug>
-#include <KIcon>
-
-#include <QtGui/QSlider>
-#include <QtGui/QToolButton>
-#include <QtGui/QDial>
-#include <QtGui/QVBoxLayout>
-#include <QtGui/QHBoxLayout>
+#include <KLocalizedString>
+#include <QSlider>
+#include <QToolButton>
+#include <QDial>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QIcon>
 
 class KMidPartView::ViewPrivate {
 public:
@@ -48,7 +37,7 @@ public:
 };
 
 KMidPartView::KMidPartView(QWidget *parent) :
-    KMediaPlayer::View(parent),
+    QWidget(parent),
     d(new ViewPrivate())
 {
     QVBoxLayout* vlayout = new QVBoxLayout(this);
@@ -56,7 +45,7 @@ KMidPartView::KMidPartView(QWidget *parent) :
     vlayout->addLayout(toprow);
 
     d->m_playstop = new QToolButton(this);
-    d->m_playstop->setIcon(KIcon("media-playback-start"));
+    d->m_playstop->setIcon(QIcon::fromTheme("media-playback-start"));
     d->m_playstop->setWhatsThis(i18nc("@info:whatsthis","Player play/stop control"));
     d->m_playstop->setToolTip(i18nc("@info:tooltip player button","Play/Stop"));
     d->m_playstop->setVisible(true);
@@ -64,7 +53,7 @@ KMidPartView::KMidPartView(QWidget *parent) :
     connect(d->m_playstop, SIGNAL(clicked()), SLOT(slotPlayStop()));
 
     d->m_pause = new QToolButton(this);
-    d->m_pause->setIcon(KIcon("media-playback-pause"));
+    d->m_pause->setIcon(QIcon::fromTheme("media-playback-pause"));
     d->m_pause->setWhatsThis(i18nc("@info:whatsthis","Player pause control"));
     d->m_pause->setToolTip(i18nc("@info:tooltip player button","Pause"));
     d->m_pause->setVisible(false);
@@ -88,8 +77,6 @@ KMidPartView::KMidPartView(QWidget *parent) :
     d->m_volume = new QDial(this);
     d->m_volume->setVisible(false);
     d->m_volume->setFixedSize(32,32);
-    d->m_volume->setWhatsThis(i18nc("@info:whatsthis","Volume factor control"));
-    d->m_volume->setToolTip(i18nc("@info:tooltip player control","Volume factor"));
     d->m_volume->setMinimum(0);
     d->m_volume->setMaximum(200);
     d->m_volume->setValue(100);
@@ -103,8 +90,6 @@ KMidPartView::KMidPartView(QWidget *parent) :
     d->m_pitch = new QDial(this);
     d->m_pitch->setVisible(false);
     d->m_pitch->setFixedSize(32,32);
-    d->m_pitch->setWhatsThis(i18nc("@info:whatsthis","Pitch transpose control"));
-    d->m_pitch->setToolTip(i18nc("@info:tooltip player control","Pitch transpose"));
     d->m_pitch->setMinimum(-12);
     d->m_pitch->setMaximum(12);
     d->m_pitch->setValue(0);
@@ -117,17 +102,13 @@ KMidPartView::KMidPartView(QWidget *parent) :
 
     d->m_resetTempo = new QToolButton(this);
     d->m_resetTempo->setVisible(false);
-    d->m_resetTempo->setIcon(KIcon("player-time"));
-    d->m_resetTempo->setWhatsThis(i18nc("@info:whatsthis","Speed factor reset"));
-    d->m_resetTempo->setToolTip(i18nc("@info:tooltip player button","Speed reset"));
+    d->m_resetTempo->setIcon(QIcon::fromTheme("player-time"));
     botrow->addWidget(d->m_resetTempo);
     connect(d->m_resetTempo, SIGNAL(clicked()), SLOT(slotTempoReset()));
 
     d->m_tempo = new QSlider(this);
     d->m_tempo->setVisible(false);
     d->m_tempo->setOrientation(Qt::Horizontal);
-    d->m_tempo->setWhatsThis(i18nc("@info:whatsthis","Speed factor control"));
-    d->m_tempo->setToolTip(i18nc("@info:tooltip player control","Speed factor"));
     d->m_tempo->setMinimum(0);
     d->m_tempo->setMaximum(200);
     d->m_tempo->setValue(100);
@@ -136,13 +117,14 @@ KMidPartView::KMidPartView(QWidget *parent) :
     connect(d->m_tempo, SIGNAL(valueChanged(int)), SLOT(slotTempoSlider(int)));
 
     setButtons(Play | Stop | Seeker);
-    connect(this, SIGNAL(buttonsChanged(int)), SLOT(slotButtonsChanged(int)));
 }
 
 KMidPartView::~KMidPartView()
-{}
+{
+    delete d;
+}
 
-void KMidPartView::slotButtonsChanged(int buttons)
+void KMidPartView::setButtons(int buttons)
 {
     d->m_playstop->setVisible( (buttons & (Play | Stop)) != 0 );
     d->m_pause->setVisible( (buttons & Pause) != 0 );
@@ -151,6 +133,7 @@ void KMidPartView::slotButtonsChanged(int buttons)
     d->m_pitch->setVisible( (buttons & Transpose) != 0 );
     d->m_resetTempo->setVisible( (buttons & Tempo) != 0 );
     d->m_tempo->setVisible( (buttons & Tempo) != 0 );
+    emit buttonsChanged(buttons);
 }
 
 void KMidPartView::resetTimePosition(qint64 totalTime)
@@ -190,10 +173,10 @@ void KMidPartView::setPlayingState(bool isPlaying)
     if (d->m_playing != isPlaying) {
         d->m_playing = isPlaying;
         if (isPlaying) {
-            d->m_playstop->setIcon(KIcon("media-playback-stop"));
+            d->m_playstop->setIcon(QIcon::fromTheme("media-playback-stop"));
             d->m_pause->setEnabled(true);
         } else {
-            d->m_playstop->setIcon(KIcon("media-playback-start"));
+            d->m_playstop->setIcon(QIcon::fromTheme("media-playback-start"));
             d->m_pause->setEnabled(false);
         }
     }
@@ -201,12 +184,12 @@ void KMidPartView::setPlayingState(bool isPlaying)
 
 void KMidPartView::slotVolumeSlider(int value)
 {
-    emit volume( value*0.01 );
+    emit volume(value * 0.01);
 }
 
 void KMidPartView::slotPitchSlider(int value)
 {
-    emit transpose( value );
+    emit transpose(value);
 }
 
 inline double tempoFactor(int sliderValue)
@@ -216,7 +199,7 @@ inline double tempoFactor(int sliderValue)
 
 void KMidPartView::slotTempoSlider(int value)
 {
-    emit speed( tempoFactor(value)/100.0 );
+    emit speed(tempoFactor(value) / 100.0);
 }
 
 void KMidPartView::slotTempoReset()

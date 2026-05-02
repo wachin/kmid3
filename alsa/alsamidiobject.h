@@ -21,15 +21,12 @@
 #define ALSAMIDIOBJECT_H
 
 #include "midiobject.h"
-#include <alsaclient.h>
+#include <drumstick/alsaclient.h>
 #include <QObject>
 
-namespace drumstick {
-    class SequencerEvent;
-}
-using namespace drumstick;
-
 namespace KMid {
+
+using namespace drumstick::ALSA;
 
     class ALSAMIDIOutput;
 

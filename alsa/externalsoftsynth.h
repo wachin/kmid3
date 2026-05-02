@@ -24,11 +24,12 @@
 #include <QMap>
 #include <QVariant>
 #include <QThread>
-#include <KProcess>
+#include <QProcess>
+
+class Settings;
 
 namespace KMid {
     class MIDIOutput;
-    class Settings;
 }
 
 using namespace KMid;
@@ -75,7 +76,7 @@ protected:
     QMap<QString, QVariant> m_oldSettingValues;
     QStringList m_settingsNames;
     QStringList m_warnings;
-    KProcess m_process;
+    QProcess m_process;
     QString  m_prettyName;
     QString  m_version;
     QThread m_thread;

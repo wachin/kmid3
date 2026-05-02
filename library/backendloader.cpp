@@ -19,8 +19,12 @@
 
 #include "backendloader.h"
 #include "backend.h"
-#include <KServiceTypeTrader>
-#include <KDebug>
+
+#include <KPluginFactory>
+#include <KPluginLoader>
+#include <KPluginMetaData>
+#include <QDebug>
+#include <QVector>
 
 namespace KMid {
 
@@ -33,20 +37,23 @@ namespace KMid {
 
     void BackendLoader::loadAllBackends()
     {
-        KService::List offers = KServiceTypeTrader::self()->query("KMid/backend");
-        foreach (const KService::Ptr &service, offers)
-        {
-            KPluginFactory *factory = KPluginLoader(service->library()).factory();
-            if (factory == NULL) {
-                kError() << "KPluginFactory could not load the backend:"
-                         << service->library();
+        // KF5: use KPluginLoader to find plugins by service type
+        QVector<KPluginMetaData> offers = KPluginLoader::findPlugins(
+            QString(), [](const KPluginMetaData &md) {
+                return md.serviceTypes().contains(QLatin1String("KMid/backend"));
+            });
+
+        for (const KPluginMetaData &md : offers) {
+            KPluginLoader loader(md.fileName());
+            KPluginFactory *factory = loader.factory();
+            if (!factory) {
+                qWarning() << "KPluginFactory could not load the backend:" << md.fileName()
+                           << loader.errorString();
                 continue;
             }
             Backend *backend = factory->create<Backend>(this, QVariantList());
-            if (backend != NULL)
-               emit loaded(backend, service->library(), service->name());
+            if (backend != nullptr)
+                emit loaded(backend, md.fileName(), md.name());
         }
     }
 }
-
-#include "backendloader.moc"

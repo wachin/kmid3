@@ -25,16 +25,21 @@
 #include "externalsoftsynth.h"
 #include "settings.h"
 
-#include <kdemacros.h>
-#include <KPluginFactory>
-#include <KPluginLoader>
-#include <KStandardDirs>
-#include <KMessageBox>
-#include <KLocale>
-#include <QWidget>
-#include <sched.h>
 
-using namespace drumstick;
+#include <KPluginFactory>
+
+#include <QStandardPaths>
+#include <KMessageBox>
+#include <KLocalizedString>
+
+#include <QWidget>
+#include <KFileItem>
+#include <KFile>
+#include <sched.h>
+#include <QDebug>
+#include <drumstick/sequencererror.h>
+
+using namespace drumstick::ALSA;
 
 namespace KMid {
 
@@ -83,7 +88,7 @@ namespace KMid {
                 "Returned error was: %1", ex.qstrError());
             KMessageBox::error(0, errorstr, i18nc("@title:window","ALSA Sequencer Backend Error"));
         } catch (...) {
-        	kDebug() << "Fatal error from the ALSA sequencer backend. "
+        	qDebug() << "Fatal error from the ALSA sequencer backend. "
             "This usually happens when the kernel does not have ALSA support, "
             "the device node (/dev/snd/seq) does not exist, "
             "or the kernel module (snd_seq) is not loaded. "
@@ -123,19 +128,13 @@ namespace KMid {
 
     void ALSABackend::setupConfigurationWidget(QWidget* widget)
     {
-        if (widget != NULL) {
+        if (widget != nullptr) {
             d->ui_prefs_progs.setupUi(widget);
-            #if KDE_IS_VERSION(4,3,0)
-                QString exepath = KGlobal::dirs()->installPath("exe");
-                QString datapath = KGlobal::dirs()->installPath("sound") + "sf2/";
-                d->ui_prefs_progs.kcfg_cmd_fluid->setMode(KFile::File|KFile::ExistingOnly|KFile::LocalOnly);
-                d->ui_prefs_progs.kcfg_sf2_fluid->setMode(KFile::File|KFile::ExistingOnly|KFile::LocalOnly);
-                d->ui_prefs_progs.kcfg_cmd_timidity->setMode(KFile::File|KFile::ExistingOnly|KFile::LocalOnly);
-                d->ui_prefs_progs.kcfg_cmd_fluid->setStartDir(exepath);
-                d->ui_prefs_progs.kcfg_sf2_fluid->setStartDir(datapath);
-                d->ui_prefs_progs.kcfg_cmd_timidity->setStartDir(exepath);
-                d->ui_prefs_progs.kcfg_sf2_fluid->setFilter("*.SF2");
-             #endif
+            // KF5: KUrlRequester setMode/setStartDir/setFilter still work
+            d->ui_prefs_progs.kcfg_cmd_fluid->setMode(KFile::File | KFile::ExistingOnly | KFile::LocalOnly);
+            d->ui_prefs_progs.kcfg_sf2_fluid->setMode(KFile::File | KFile::ExistingOnly | KFile::LocalOnly);
+            d->ui_prefs_progs.kcfg_cmd_timidity->setMode(KFile::File | KFile::ExistingOnly | KFile::LocalOnly);
+            d->ui_prefs_progs.kcfg_sf2_fluid->setFilter("*.SF2 *.sf2");
         }
     }
 
@@ -203,8 +202,8 @@ namespace KMid {
         bool Ok = d->m_fluidsynth->isProgramOK();
         version = d->m_fluidsynth->programVersion();
         d->ui_prefs_progs.label_fluid_available->setPixmap(
-            Ok ? KIcon("flag-green").pixmap(24,24) :
-                 KIcon("flag-red").pixmap(24,24) );
+            Ok ? QIcon::fromTheme("flag-green").pixmap(24,24) :
+                 QIcon::fromTheme("flag-red").pixmap(24,24) );
         d->ui_prefs_progs.label_fluid_available->setText(
             version.isEmpty() ? i18nc("@info","Not found") :
                 i18nc("@info","Found version: %1", version) );
@@ -217,8 +216,8 @@ namespace KMid {
         Ok = d->m_timidity->isProgramOK();
         version = d->m_timidity->programVersion();
         d->ui_prefs_progs.label_timidity_available->setPixmap(
-            Ok ? KIcon("flag-green").pixmap(24,24) :
-                 KIcon("flag-red").pixmap(24,24) );
+            Ok ? QIcon::fromTheme("flag-green").pixmap(24,24) :
+                 QIcon::fromTheme("flag-red").pixmap(24,24) );
         d->ui_prefs_progs.label_timidity_available->setText(
             version.isEmpty() ? i18nc("@info","Not found") :
                 i18nc("@info","Found version: %1", version) );
@@ -235,8 +234,8 @@ namespace KMid {
         d->m_timidity->saveSettingValues();
     }
 
-    K_PLUGIN_FACTORY( ALSABackendFactory, registerPlugin<ALSABackend>(); )
-    K_EXPORT_PLUGIN( ALSABackendFactory("kmid_alsa") )
 }
 
+K_PLUGIN_FACTORY_WITH_JSON(ALSABackendFactory, "kmid_alsa.json", registerPlugin<KMid::ALSABackend>();)
 #include "alsabackend.moc"
+

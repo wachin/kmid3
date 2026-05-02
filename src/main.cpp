@@ -19,46 +19,51 @@
 
 #include <config.h>
 #include "kmid2.h"
-#include <kapplication.h>
-#include <kaboutdata.h>
-#include <kcmdlineargs.h>
-#include <KDE/KLocale>
-#include <KUrl>
 
-static const char description[] =
-    I18N_NOOP("A KDE 4 MIDI/Karaoke player");
+#include <KAboutData>
+#include <KLocalizedString>
+#include <QApplication>
+#include <QCommandLineParser>
+#include <QUrl>
 
+static const char description[] = I18N_NOOP("A KDE MIDI/Karaoke player");
 static const char version[] = VERSION;
 
 int main(int argc, char **argv)
 {
-    KAboutData about( "kmid", 0, ki18n("KMid"), version, ki18n(description),
-                      KAboutData::License_GPL );
-    about.addAuthor( ki18n("Pedro Lopez-Cabanillas"), ki18n("Maintainer"),
-                     "plcl@users.sf.net" );
-    about.addAuthor( ki18n("Antonio Larrosa Jimenez"), ki18n("Author"),
-                     "larrosa@kde.org" );
-    KCmdLineArgs::init(argc, argv, &about);
-    KCmdLineOptions options;
-    options.add("+[URL]", ki18n( "Song(s) to open" ));
-    KCmdLineArgs::addCmdLineOptions(options);
-    KApplication app;
+    QApplication app(argc, argv);
 
-    // see if we are starting with session management
-    if (app.isSessionRestored()) {
-        kRestoreMainWindows<KMid2>();
-    } else {
-        // no session.. just start up normally
-        KMid2 *widget = new KMid2;
-        KCmdLineArgs *args = KCmdLineArgs::parsedArgs();
-        if (args->count() > 0) {
-            KUrl::List urls;
-            for (int i = 0; i < args->count(); ++i)
-                urls.append(args->url(i));
-            args->clear();
-            widget->setUrlsLater(urls);
-        }
-        widget->show();
+    KAboutData about(
+        QStringLiteral("kmid"),
+        i18n("KMid"),
+        QLatin1String(version),
+        i18n(description),
+        KAboutLicense::GPL,
+        i18n("(C) 2009-2010 Pedro Lopez-Cabanillas")
+    );
+    about.addAuthor(i18n("Pedro Lopez-Cabanillas"), i18n("Maintainer"),
+                    QStringLiteral("plcl@users.sf.net"));
+    about.addAuthor(i18n("Antonio Larrosa Jimenez"), i18n("Author"),
+                    QStringLiteral("larrosa@kde.org"));
+
+    KAboutData::setApplicationData(about);
+
+    QCommandLineParser parser;
+    about.setupCommandLine(&parser);
+    parser.addPositionalArgument(QStringLiteral("URL"), i18n("Song(s) to open"), QStringLiteral("[URL...]"));
+    parser.process(app);
+    about.processCommandLine(&parser);
+
+    KMid2 *widget = new KMid2;
+    widget->show();
+
+    QStringList args = parser.positionalArguments();
+    if (!args.isEmpty()) {
+        QList<QUrl> urls;
+        for (const QString &arg : args)
+            urls.append(QUrl::fromUserInput(arg));
+        widget->setUrlsLater(urls);
     }
+
     return app.exec();
 }

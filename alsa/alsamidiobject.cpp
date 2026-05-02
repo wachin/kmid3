@@ -23,18 +23,22 @@
 #include "player.h"
 
 #include <cmath>
-#include <qsmf.h>
-#include <alsaevent.h>
-#include <alsaqueue.h>
+#include <drumstick/qsmf.h>
+#include <drumstick/alsaevent.h>
+#include <drumstick/alsaqueue.h>
 
-#include <KIO/NetAccess>
+
 #include <QTextStream>
+#include <QFile>
+#include <QUrl>
 #include <QTextCodec>
+#include <QRegularExpression>
 #include <QTime>
 #include <QMutex>
 #include <QMutexLocker>
 
-using namespace drumstick;
+using namespace drumstick::ALSA;
+using drumstick::File::QSmf;
 
 namespace KMid {
 
@@ -213,60 +217,60 @@ namespace KMid {
                         QByteArray ba(ve->getData(), ve->getLength());
                         QString s;
                         if (d->m_codec == NULL)
-                            s = QString::fromAscii(ba);
+                            s = QString::fromLatin1(ba);
                         else
                             s = d->m_codec->toUnicode(ba);
-                        s.remove(QRegExp("[/\\\\]+"));
-                        s.remove(QRegExp("[\r\n]+"));
+                        s.remove(QRegularExpression("[/\\]+"));
+                        s.remove(QRegularExpression("[\r\n]+"));
                         emit midiText(Song::Lyric, s);
                     }
                 }
                 break;
             case SND_SEQ_EVENT_NOTEOFF: {
-                    d->m_out->sendEvent(ev);
+                    d->m_out->sendSeqEvent(ev);
                     const NoteOffEvent* n = static_cast<const NoteOffEvent*>(ev);
                     emit midiNoteOff(n->getChannel(), n->getKey(), n->getVelocity());
                 }
                 break;
             case SND_SEQ_EVENT_NOTEON: {
-                    d->m_out->sendEvent(ev);
+                    d->m_out->sendSeqEvent(ev);
                     const NoteOnEvent* n = static_cast<const NoteOnEvent*>(ev);
                     emit midiNoteOn(n->getChannel(), n->getKey(), n->getVelocity());
                 }
                 break;
             case SND_SEQ_EVENT_KEYPRESS: {
-                    d->m_out->sendEvent(ev);
+                    d->m_out->sendSeqEvent(ev);
                     const KeyPressEvent* n = static_cast<const KeyPressEvent*>(ev);
                     emit midiKeyPressure(n->getChannel(), n->getKey(), n->getVelocity());
                 }
                 break;
             case SND_SEQ_EVENT_CONTROLLER:
             case SND_SEQ_EVENT_CONTROL14: {
-                    d->m_out->sendEvent(ev);
+                    d->m_out->sendSeqEvent(ev);
                     const ControllerEvent* n = static_cast<const ControllerEvent*>(ev);
                     emit midiController(n->getChannel(), n->getParam(), n->getValue());
                 }
                 break;
             case SND_SEQ_EVENT_PGMCHANGE: {
-                    d->m_out->sendEvent(ev);
+                    d->m_out->sendSeqEvent(ev);
                     const ProgramChangeEvent* p = static_cast<const ProgramChangeEvent*>(ev);
                     emit midiProgram(p->getChannel(), p->getValue());
                 }
                 break;
             case SND_SEQ_EVENT_CHANPRESS: {
-                    d->m_out->sendEvent(ev);
+                    d->m_out->sendSeqEvent(ev);
                     const ChanPressEvent* n = static_cast<const ChanPressEvent*>(ev);
                     emit midiChannelPressure(n->getChannel(), n->getValue());
                 }
                 break;
             case SND_SEQ_EVENT_PITCHBEND: {
-                    d->m_out->sendEvent(ev);
+                    d->m_out->sendSeqEvent(ev);
                     const PitchBendEvent* n = static_cast<const PitchBendEvent*>(ev);
                     emit midiPitchBend(n->getChannel(), n->getValue());
                 }
                 break;
             default:
-                d->m_out->sendEvent(ev);
+                d->m_out->sendSeqEvent(ev);
             }
         delete ev;
     }
@@ -667,49 +671,47 @@ namespace KMid {
     void ALSAMIDIObject::openFile(const QString &fileName)
     {
         QMutexLocker locker(&d->m_openMutex);
-        QString tmpFile;
-        if(KIO::NetAccess::download(fileName, tmpFile, 0)) {
-            updateState( LoadingState );
-            d->m_song.clear();
-            d->m_loadingMessages.clear();
-            d->m_tick = 0;
-            d->m_initialTempo = 0;
-            d->m_duration = 0;
-            d->m_lastBeat = 0;
-            d->m_barCount = 0;
-            d->m_beatCount = 0;
-            d->m_beatMax = 4;
-            d->m_lowestMidiNote = 127;
-            d->m_highestMidiNote = 0;
-            for(int i=0; i<MIDI_CHANNELS; ++i) {
-                d->m_channelUsed[i] = false;
-                d->m_channelEvents[i] = 0;
-                d->m_channelLabel[i].clear();
-                d->m_channelPatches[i] = -1;
-            }
-            try {
-                d->m_engine->readFromFile(tmpFile);
-                if (!d->m_song.isEmpty()) {
-                    d->m_song.sort();
-                    addSongPadding();
-                    if (d->m_initialTempo == 0)
-                        d->m_initialTempo = 500000;
-                    d->m_song.setFileName(fileName);
-                    d->m_player->setSong(&d->m_song);
-                    d->setQueueTempo();
-                    d->m_player->resetPosition();
-                    setTickInterval(d->m_song.getDivision() / 6);
-                    updateState( StoppedState );
-                    emit currentSourceChanged(fileName);
-                }
-            } catch (...) {
-                d->m_song.clear();
-                updateState( ErrorState );
-            }
-            KIO::NetAccess::removeTempFile(tmpFile);
-        } else {
-            d->m_loadingMessages << KIO::NetAccess::lastErrorString();
-            updateState( ErrorState );
+        // Support local files and URLs
+        QString localFile = fileName;
+        QUrl url(fileName);
+        if (url.isLocalFile())
+            localFile = url.toLocalFile();
+        if (!QFile::exists(localFile)) {
+            d->m_loadingMessages << QString("Cannot open file: %1").arg(fileName);
+            updateState(ErrorState);
+            return;
+        }
+        updateState(LoadingState);
+        d->m_song.clear();
+        d->m_loadingMessages.clear();
+        d->m_tick = 0;
+        d->m_initialTempo = 0;
+        d->m_duration = 0;
+        d->m_lastBeat = 0;
+        d->m_barCount = 0;
+        d->m_beatCount = 0;
+        d->m_beatMax = 4;
+        d->m_lowestMidiNote = 127;
+        d->m_highestMidiNote = 0;
+        for(int i=0; i<MIDI_CHANNELS; ++i) {
+            d->m_channelUsed[i] = false;
+            d->m_channelEvents[i] = 0;
+            d->m_channelLabel[i].clear();
+            d->m_channelPatches[i] = -1;
+        }
+        d->m_engine->readFromFile(localFile);
+        if (!d->m_song.isEmpty()) {
+            d->m_song.sort();
+            addSongPadding();
+            if (d->m_initialTempo == 0)
+                d->m_initialTempo = 500000;
+            d->m_song.setFileName(fileName);
+            d->m_player->setSong(&d->m_song);
+            d->setQueueTempo();
+            d->m_player->resetPosition();
+            setTickInterval(d->m_song.getDivision() / 6);
+            updateState(StoppedState);
+            emit currentSourceChanged(fileName);
         }
     }
 
@@ -826,7 +828,7 @@ namespace KMid {
     {
         if (channel >= 0 && channel < MIDI_CHANNELS) {
             if (d->m_codec == NULL)
-                return QString::fromAscii(d->m_channelLabel[channel]);
+                return QString::fromLatin1(d->m_channelLabel[channel]);
             else
                 return d->m_codec->toUnicode(d->m_channelLabel[channel]);
         }
@@ -872,5 +874,6 @@ namespace KMid {
     }
 
 }
+
 
 #include "alsamidiobject.moc"

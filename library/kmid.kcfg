@@ -3,13 +3,14 @@
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
                           http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
-  <include>kglobalsettings.h</include>
+  <include>QFont</include>
+  <include>QColor</include>
   <include>kmidmacros.h</include>
   <kcfgfile name="kmidrc"/>
   <group name="Settings">
     <entry name="font" type="Font">
       <label>The font used to display the lyrics.</label>
-      <default code="true">KGlobalSettings::fixedFont()</default>
+      <default code="true">QFont("Monospace", 12)</default>
     </entry>
     <entry name="size" type="Int">
       <label>Size of the lyrics font</label>
@@ -131,23 +132,6 @@
     <entry name="args_timidity" type="String">
       <label>Arguments</label>
       <default>--sequencer-ports=1</default>
-    </entry>
-    
-    <entry name="exec_dls" type="Bool">
-      <label>Enable DLS Synth at startup</label>
-      <default>true</default>
-    </entry>
-    <entry name="default_dls" type="Bool">
-      <label>Default Apple DLS Sound Set</label>
-      <default>true</default>
-    </entry>
-    <entry name="soundfont_dls" type="Url">
-      <label>Sound Font</label>
-      <default></default>
-    </entry>
-    <entry name="reverb_dls" type="Bool">
-      <label>Use Internal Reverb</label>
-      <default>true</default>
     </entry>
 
   </group>

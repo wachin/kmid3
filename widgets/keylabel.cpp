@@ -22,5 +22,5 @@
 KeyLabel::KeyLabel(QGraphicsItem *parent) : QGraphicsTextItem(parent)
 {
     setAcceptedMouseButtons(Qt::NoButton);
-    rotate(270);
+    setRotation(270);
 }

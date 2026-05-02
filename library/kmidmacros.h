@@ -20,12 +20,12 @@
 #ifndef KMIDMACROS_H
 #define KMIDMACROS_H
 
-#include <kdemacros.h>
+#include <QtCore/QtGlobal>
 
 #ifdef MAKE_KMIDBACKEND_LIB
-#define KMIDBACKEND_EXPORT KDE_EXPORT
-#else /*MAKE_KMIDBACKEND_LIB*/
-#define KMIDBACKEND_EXPORT KDE_IMPORT
-#endif /*MAKE_KMIDBACKEND_LIB*/
+#define KMIDBACKEND_EXPORT Q_DECL_EXPORT
+#else
+#define KMIDBACKEND_EXPORT Q_DECL_IMPORT
+#endif
 
 #endif /* KMIDMACROS_H */

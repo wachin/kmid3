@@ -23,11 +23,11 @@
 #include "backend.h"
 #include <QObject>
 
+class Settings;
+
 namespace KMid {
 
-    class Settings;
-
-    class KDE_EXPORT ALSABackend : public Backend
+    class ALSABackend : public Backend
     {
         Q_OBJECT
         public:

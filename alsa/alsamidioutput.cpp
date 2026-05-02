@@ -21,16 +21,16 @@
 #include "midimapper.h"
 
 #include <cmath>
-#include <alsaclient.h>
-#include <alsaport.h>
-#include <alsaevent.h>
+#include <drumstick/alsaclient.h>
+#include <drumstick/alsaport.h>
+#include <drumstick/alsaevent.h>
 
 #include <QString>
 #include <QStringList>
 #include <QMutex>
 #include <QMutexLocker>
 
-using namespace drumstick;
+using namespace drumstick::ALSA;
 
 namespace KMid {
 
@@ -369,7 +369,7 @@ namespace KMid {
             sendSysexEvent(d->m_resetMessage);
     }
 
-    void ALSAMIDIOutput::sendEvent(SequencerEvent *ev, bool discardable)
+    void ALSAMIDIOutput::sendSeqEvent(SequencerEvent *ev, bool discardable)
     {
         QMutexLocker locker(&d->m_outMutex);
         d->transformEvent(ev);
@@ -392,49 +392,49 @@ namespace KMid {
     void ALSAMIDIOutput::sendNoteOn(int chan, int note, int vel)
     {
         NoteOnEvent ev(chan, note, vel);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     void ALSAMIDIOutput::sendNoteOff(int chan, int note, int vel)
     {
         NoteOffEvent ev(chan, note, vel);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     void ALSAMIDIOutput::sendController(int chan, int control, int value)
     {
         ControllerEvent ev(chan, control, value);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     void ALSAMIDIOutput::sendKeyPressure(int chan, int note, int value)
     {
         KeyPressEvent ev(chan, note, value);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     void ALSAMIDIOutput::sendProgram(int chan, int program)
     {
         ProgramChangeEvent ev(chan, program);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     void ALSAMIDIOutput::sendChannelPressure(int chan, int value)
     {
         ChanPressEvent ev(chan, value);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     void ALSAMIDIOutput::sendPitchBend(int chan, int value)
     {
         PitchBendEvent ev(chan, value);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     void ALSAMIDIOutput::sendSysexEvent(const QByteArray& data)
     {
         SysExEvent ev(data);
-        sendEvent(&ev);
+        sendSeqEvent(&ev);
     }
 
     MidiClient* ALSAMIDIOutput::client() const
@@ -452,10 +452,11 @@ namespace KMid {
         int pgm(d->m_locked[chan] ? d->m_lockedpgm[chan] : program);
         if (pgm > -1) {
             ProgramChangeEvent ev(chan, pgm);
-            sendEvent(&ev, false);
+            sendSeqEvent(&ev, false);
         }
     }
 
 }
+
 
 #include "alsamidioutput.moc"

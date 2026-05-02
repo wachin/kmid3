@@ -21,9 +21,9 @@
 
 #include "midimapper.h"
 #include <QMap>
+#include <QDebug>
 #include <KConfig>
 #include <KConfigGroup>
-#include <KDebug>
 
 namespace KMid {
 
@@ -187,7 +187,7 @@ namespace KMid {
 
         void load(const QString &fileName)
         {
-            KConfig cfg(fileName, KConfig::CascadeConfig, "appdata");
+            KConfig cfg(fileName, KConfig::CascadeConfig);
             init();
             m_filename = cfg.name();
 
@@ -202,7 +202,7 @@ namespace KMid {
                     if (idx > -1 && ok)
                         m_patchmap[idx] = val;
                     else
-                        kWarning() << it.key() << "=" << it.value();
+                        qWarning() << it.key() << "=" << it.value();
                 }
             }
 
@@ -217,7 +217,7 @@ namespace KMid {
                     if (ok1 && ok2)
                         m_forcedkey[idx] = val;
                     else
-                        kWarning() << it.key() << "=" << it.value();
+                        qWarning() << it.key() << "=" << it.value();
                 }
             }
 
@@ -232,7 +232,7 @@ namespace KMid {
                     if (idx > -1 && ok)
                         m_keymap[idx] = val;
                     else
-                        kWarning() << it.key() << "=" << it.value();
+                        qWarning() << it.key() << "=" << it.value();
                 }
             }
 
@@ -249,7 +249,7 @@ namespace KMid {
                     if (ok1 && ok2)
                         m_channelmap[idx] = val;
                     else
-                        kWarning() << it.key() << "=" << it.value();
+                        qWarning() << it.key() << "=" << it.value();
                 }
             }
 
@@ -258,7 +258,7 @@ namespace KMid {
                 m_forceDrumsPatch = grp.readEntry("ForceDrumsPatch", -1);
                 m_mapPitchBender = grp.hasKey("PitchBenderRatio");
                 if (m_mapPitchBender)
-                    m_pitchBenderRatio =  grp.readEntry("PitchBenderRatio", 4096);
+                    m_pitchBenderRatio = grp.readEntry("PitchBenderRatio", 4096);
                 m_mapExpressionToVolumeEvents =
                         grp.readEntry("MapExpressionToVolumeEvents", false);
             }
@@ -266,70 +266,16 @@ namespace KMid {
         }
 
         QStringList m_patchNamesList;
-
         QStringList m_keyNamesList;
-
-        /**
-         * Object statusOK
-         */
         bool m_ok;
-
-        /**
-         * @internal
-         * Channel map translator
-         */
         uchar m_channelmap[MIDI_CHANNELS];
-
-        /**
-         * @internal
-         * It's -1 if the drums channel doesn't have a forced patch,
-         * else indicates the patch to force in the channel.
-         */
         int m_forceDrumsPatch;
-
-        /**
-         * @internal
-         * Patch map translator
-         */
         uchar m_patchmap[128];
-
-        /**
-         * @internal
-         * Key map translator (for drums)
-         */
         uchar m_keymap[128];
-
-        /**
-         * @internal
-         * Forced Key by patch
-         */
         int m_forcedkey[128];
-
-        /**
-         * @internal
-         * Stores the name of the file from which the map was loaded
-         */
         QString m_filename;
-
-        /**
-         * @internal
-         * Simulate expression events with volume events
-         */
         bool m_mapExpressionToVolumeEvents;
-
-        /**
-         * @internal
-         * Map or not the Pitch Bender using m_pitchBenderRatio
-         */
         bool m_mapPitchBender;
-
-        /**
-         * @internal
-         * Indicates the ratio between the standard and the synthesizer's pitch
-         * bender engine. The number sent to the synth is multiplied by this
-         * and dividied by 4096. Thus if PitchBenderRatio is 4096, the synth's
-         * pitch bender works as the standard one
-         */
         int m_pitchBenderRatio;
     };
 
@@ -337,9 +283,6 @@ namespace KMid {
         d(new MidiMapperPrivate)
     { }
 
-    /**
-     * Destructor.
-     */
     MidiMapper::~MidiMapper()
     {
         delete d;
@@ -352,7 +295,7 @@ namespace KMid {
 
     void MidiMapper::loadFile(const QString &fileName)
     {
-        d->load( fileName );
+        d->load(fileName);
     }
 
     void MidiMapper::clear()
@@ -367,14 +310,12 @@ namespace KMid {
 
     uchar MidiMapper::controller(uchar ctl)
     {
-        if ( d->m_mapExpressionToVolumeEvents )
-            switch ( ctl ) {
+        if (d->m_mapExpressionToVolumeEvents)
+            switch (ctl) {
             case MIDI_CTL_MSB_EXPRESSION:
                 return MIDI_CTL_MSB_MAIN_VOLUME;
-                break;
             case MIDI_CTL_LSB_EXPRESSION:
                 return MIDI_CTL_LSB_MAIN_VOLUME;
-                break;
             }
         return ctl;
     }
@@ -384,13 +325,13 @@ namespace KMid {
         if (chn == MIDI_GM_DRUM_CHANNEL)
             return d->m_keymap[note];
         else if (d->m_forcedkey[pgm] > -1)
-                return d->m_forcedkey[pgm];
+            return d->m_forcedkey[pgm];
         return note;
     }
 
     uchar MidiMapper::patch(uchar chn, uchar pgm)
     {
-        if ( chn == MIDI_GM_DRUM_CHANNEL && d->m_forceDrumsPatch > -1)
+        if (chn == MIDI_GM_DRUM_CHANNEL && d->m_forceDrumsPatch > -1)
             return d->m_forceDrumsPatch;
         return d->m_patchmap[pgm];
     }

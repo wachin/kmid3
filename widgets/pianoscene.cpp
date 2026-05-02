@@ -21,6 +21,7 @@
 #include <QPalette>
 #include <QGraphicsSceneMouseEvent>
 #include <QKeyEvent>
+#include <QTransform>
 
 #define KEYWIDTH  18
 #define KEYHEIGHT 72
@@ -151,7 +152,7 @@ void PianoScene::keyOff(const int note)
 
 PianoKey* PianoScene::getKeyForPos( const QPointF& p ) const
 {
-    QGraphicsItem *itm = itemAt(p);
+    QGraphicsItem *itm = itemAt(p, QTransform());
     while (itm != NULL && itm->parentItem() != NULL)
         itm = itm->parentItem();
     if (itm != NULL) {
