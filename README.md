@@ -1,6 +1,8 @@
 # kmid3
 
-Port de **KMid 2.4.0** actualizado para compilar y funcionar en 2026 con Qt5, KDE Frameworks 5 y drumstick moderno.
+Port de **KMid 2.4.0** actualizado para compilar y funcionar en 2026 con Qt5, KDE Frameworks 5 y drumstick moderno:
+
+![](vx_images/01-kmid3-funcionando-en-Debian-12.png)
 
 ---
 
