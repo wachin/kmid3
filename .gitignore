@@ -1,0 +1,131 @@
+# =============================================================================
+# CMake build directories
+# =============================================================================
+build/
+build_*/
+_build/
+out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+ecm_uninstall.cmake
+Makefile
+install_manifest.txt
+compile_commands.json
+prefix.sh
+
+# =============================================================================
+# CMake generated files
+# =============================================================================
+*.cmake
+!cmake/Find*.cmake
+
+# =============================================================================
+# Compiled binaries and libraries
+# =============================================================================
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.moc
+
+# =============================================================================
+# Qt / KDE generated files
+# =============================================================================
+*.qm
+*.pro.user
+*.pro.user.*
+.qmake.stash
+.qmake.cache
+
+# =============================================================================
+# KDE / KConfig generated settings
+# =============================================================================
+*.kcfg.cpp
+*.kcfg.h
+
+# =============================================================================
+# Generated config headers
+# =============================================================================
+config.h
+src/config.h
+
+# =============================================================================
+# Editor and IDE files
+# =============================================================================
+# VS Code
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/c_cpp_properties.json
+.vscode/*.log
+
+# CLion / JetBrains
+.idea/
+cmake-build-*/
+
+# Kate / KDevelop
+*.kate-swp
+*.kdev4
+.kdev_include_paths
+.kateproject
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+\#*\#
+.\#*
+*.elc
+
+# =============================================================================
+# OS generated files
+# =============================================================================
+# Linux
+.directory
+.Trash-*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =============================================================================
+# Logs and temporary files
+# =============================================================================
+*.log
+*.tmp
+*.temp
+CMakeFiles/CMakeOutput.log
+CMakeFiles/CMakeError.log
+
+# =============================================================================
+# Package / distribution artifacts
+# =============================================================================
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.zip
+*.rpm
+*.deb
