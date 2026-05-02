@@ -138,3 +138,12 @@ killall timidity
 - Los avisos de **iconos** (`hi16-app-kmid.png` frente al formato que espera `ecm_install_icons`) son cosméticos; se pueden renombrar más adelante si quieres silenciar ECM.
 - Si al ejecutar falta algún `.so` o plugin en tiempo de ejecución, indica el mensaje exacto de la terminal y se puede resolver ajustando el prefijo de instalación o con `LD_LIBRARY_PATH` / `QT_PLUGIN_PATH`.
 - Si instalas con `-DCMAKE_INSTALL_PREFIX=/usr/local` y el sistema no encuentra `kmid` en el PATH, añade `/usr/local/bin` a tu PATH: `export PATH="/usr/local/bin:$PATH"`.
+
+
+## Para continuar con el desarrollo el Roadmap
+
+Si eres desarrollador lee el Roadmap para continuar mejorando el programa:
+
+[ROADMAP.md](ROADMAP.md)
+
+---
